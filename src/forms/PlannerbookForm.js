@@ -1,16 +1,17 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from "react";
 
 export function PlannerbookForm({ onSubmit }) {
   const [executionDateValid, setExecutionDateValid] = useState(true);
   const formRef = useRef(null); // Step 1: Create a ref for the form
-  const url = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL + "/v1/api/plannerbooks";
+  const url =
+    process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL + "/v1/api/plannerbooks";
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.target);
     const data = Object.fromEntries(formData.entries());
 
-    data.action = data.action === 'Enable' ? 1 : 0;
+    data.action = data.action === "Enable" ? 1 : 0;
 
     const executionDate = new Date(data.executionDate);
     const now = new Date();
@@ -23,9 +24,9 @@ export function PlannerbookForm({ onSubmit }) {
 
     try {
       const response = await fetch(url, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
       });
@@ -40,12 +41,14 @@ export function PlannerbookForm({ onSubmit }) {
       // Refresh the page after successful submission
       window.location.reload();
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error("Error submitting form:", error);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} ref={formRef}> {/* Step 3: Attach the ref to the form */}
+    <form onSubmit={handleSubmit} ref={formRef}>
+      {" "}
+      {/* Step 3: Attach the ref to the form */}
       <select name="campaign" required>
         <option value="">Select Campaign</option>
         <option value="Przeprowadzki">Przeprowadzki</option>
@@ -57,8 +60,16 @@ export function PlannerbookForm({ onSubmit }) {
         <option value="Enable">Enable</option>
         <option value="Disable">Disable</option>
       </select>
-      <input type="datetime-local" name="executionDate" placeholder="Execution Date" required onChange={() => setExecutionDateValid(true)} />
-      {!executionDateValid && <p style={{ color: 'red' }}>Execution date cannot be in the past.</p>}
+      <input
+        type="datetime-local"
+        name="executionDate"
+        placeholder="Execution Date"
+        required
+        onChange={() => setExecutionDateValid(true)}
+      />
+      {!executionDateValid && (
+        <p style={{ color: "red" }}>Execution date cannot be in the past.</p>
+      )}
       <button type="submit">Submit</button>
     </form>
   );
