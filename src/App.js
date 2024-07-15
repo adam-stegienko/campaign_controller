@@ -7,7 +7,6 @@ import { GoogleResponseComponent } from "./handlers/GoogleResponseComponent";
 import { PlannerbookForm } from "./forms/PlannerbookForm";
 
 function App() {
-
   const [apiResponseData, setApiResponseData] = useState(null);
 
   const handleFormSubmit = (data) => {
