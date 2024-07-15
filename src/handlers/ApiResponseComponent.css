@@ -1,0 +1,30 @@
+.table-responsive {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+th, td {
+    padding: 12px 15px;
+    border: 1px solid #ddd; /* Light grey border */
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2; /* Light grey background */
+    color: #333; /* Dark text color for contrast */
+}
+
+tr:nth-child(even) {
+    background-color: #f9f9f9; /* Zebra striping for rows */
+}
+
+tr:hover {
+    background-color: #eaeaea; /* Light grey background on hover */
+}
+
+/* Add more styles here for further customization */
