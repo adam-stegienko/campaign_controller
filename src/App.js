@@ -16,13 +16,18 @@ function useApiResponse() {
 
 function App() {
   const { apiResponseData, handleFormSubmit } = useApiResponse();
+  const [eventData, setEventData] = useState([]);
+
+  const handleDataUpdate = (data) => {
+    setEventData(data);
+  };
 
   return (
     <>
       <ApiResponseComponent data={apiResponseData} />
       <GoogleResponseComponent data={apiResponseData} />
       <PlannerbookForm onSubmit={handleFormSubmit} />
-      <EventsController />
+      <EventsController onDataUpdate={handleDataUpdate} />
     </>
   );
 }

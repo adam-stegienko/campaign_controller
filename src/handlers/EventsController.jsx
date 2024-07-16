@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 
-export function EventsController() {
-  const [events, setEvents] = useState([]);
+export function EventsController({ onDataUpdate }) {
+  const [data, setData] = useState([]);
 
   useEffect(() => {
-    const subscribeEventsUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL + "/v1/api/plannerbooks/events";
+    const subscribeEventsUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL + "/events";
     const eventSource = new EventSource(subscribeEventsUrl);
 
     eventSource.onopen = () => {
@@ -13,15 +13,17 @@ export function EventsController() {
 
     eventSource.onmessage = (event) => {
       console.log("Received event", event);
-      const newEvent = JSON.parse(event.data);
-      // Add a temporary unique identifier (e.g., timestamp + random) to each event for tracking
-      const eventWithId = { ...newEvent, id: Date.now() + Math.random() };
-      setEvents((prevEvents) => [...prevEvents, eventWithId]);
-
-      // Set a timeout to remove the event after 10 seconds
-      setTimeout(() => {
-        setEvents((prevEvents) => prevEvents.filter((e) => e.id !== eventWithId.id));
-      }, 10000); // 10000 milliseconds = 10 seconds
+      try {
+        const newEvent = JSON.parse(event.data);
+        setData((prevData) => {
+          const updatedData = [...prevData, newEvent];
+          // Call the onDataUpdate function passed from the parent component
+          onDataUpdate(updatedData);
+          return updatedData;
+        });
+      } catch (error) {
+        console.error("Error parsing event data:", event.data, error);
+      }
     };
 
     eventSource.onerror = (event) => {
@@ -36,16 +38,14 @@ export function EventsController() {
       eventSource.close();
       console.log("EventSource closed");
     };
-  }, []);
+  }, [onDataUpdate]);
 
   return (
     <div>
-      <h2>Events</h2>
-      <div>
-        {events.map((event, index) => (
-          <pre key={event.id}>{JSON.stringify(event, null, 2)}</pre>
-        ))}
-      </div>
+        <h2>Received Data</h2>
+        {data.map((d, index) =>
+          <span key={index}>{JSON.stringify(d)}</span>
+        )}
     </div>
   );
 }
