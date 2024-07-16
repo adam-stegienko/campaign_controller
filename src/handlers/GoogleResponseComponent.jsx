@@ -7,7 +7,6 @@ export function GoogleResponseComponent() {
     useEffect(() => {
         // Correct path for fetching from the public directory
         const localFile = process.env.PUBLIC_URL + '/data/google_data.json';
-        console.log(`Fetching data from ${localFile}`);
         fetch(localFile)
           .then(response => {
             if (!response.ok) {
@@ -16,7 +15,6 @@ export function GoogleResponseComponent() {
             return response.json();
           })
           .then(data => {
-            console.log('Google data fetched successfully:', data);
             setData(data);
           })
           .catch(error => console.error('Error fetching Google data:', error));
@@ -34,7 +32,7 @@ export function GoogleResponseComponent() {
                 </thead>
                 <tbody>
                     {data.map((item) => (
-                        <tr key={item.id}> {/* Ensure each child in a list has a unique "key" prop. */}
+                        <tr key={item.id}>
                             <td>{item.campaign}</td>
                             <td>{item.state}</td>
                         </tr>

@@ -6,7 +6,6 @@ export function ApiResponseComponent() {
 
   useEffect(() => {
     const url = `${process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL}/v1/api/plannerbooks`;
-    console.log(`Fetching data from ${url}`);
     fetch(url)
       .then((response) => {
         if (!response.ok) {
@@ -15,7 +14,6 @@ export function ApiResponseComponent() {
         return response.json();
       })
       .then((data) => {
-        console.log("Data fetched successfully:", data);
         setData(data);
       })
       .catch((error) => console.error("Error fetching data:", error));
@@ -46,7 +44,6 @@ export function ApiResponseComponent() {
           }
           // Update state to remove the deleted item
           setData(data.filter((item) => item.id !== id));
-          console.log(`Data for id ${id} deleted successfully`);
         })
         .catch((error) => console.error("Error deleting data:", error));
     }

@@ -1,13 +1,16 @@
 [
     {
+        "id": 1,
         "campaign": "Przeprowadzki",
         "state": "Active"
     },
     {
+        "id": 2,
         "campaign": "Transport",
         "state": "Active"
     },
     {
+        "id": 3,
         "campaign": "Magazynowanie",
         "state": "Active"
     }
