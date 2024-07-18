@@ -15,12 +15,10 @@ export function EventsController({ onDataUpdate }) {
       console.log("Received event", event);
       try {
         const newEvent = JSON.parse(event.data);
-        setData((prevData) => {
-          const updatedData = [...prevData, newEvent];
-          // Call the onDataUpdate function passed from the parent component
-          onDataUpdate(updatedData);
-          return updatedData;
-        });
+        setData(
+          newEvent,
+          onDataUpdate(newEvent)
+        );
       } catch (error) {
         console.error("Error parsing event data:", event.data, error);
       }
@@ -43,9 +41,16 @@ export function EventsController({ onDataUpdate }) {
   return (
     <div>
         <h2>Received Data</h2>
-        {data.map((d, index) =>
-          <span key={index}>{JSON.stringify(d)}</span>
-        )}
+        {console.log("data: ", data[0].id)}
+        <div>
+          {data.map((event) => (
+            <div key={event.id}>
+              <div>{event.id}</div>
+              <div>{event.campaign}</div>
+              <div>{event.action}</div>
+            </div>
+          ))}
+        </div>
     </div>
   );
 }
