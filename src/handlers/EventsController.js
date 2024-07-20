@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 export function EventsController({ onDataUpdate }) {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState(null);
 
   useEffect(() => {
     const subscribeEventsUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL + "/events";
@@ -15,10 +15,9 @@ export function EventsController({ onDataUpdate }) {
       console.log("Received event", event);
       try {
         const newEvent = JSON.parse(event.data);
-        setData(
-          newEvent,
-          onDataUpdate(newEvent)
-        );
+        setData(newEvent);
+        onDataUpdate(newEvent);
+        console.log("Parsed event data", newEvent);
       } catch (error) {
         console.error("Error parsing event data:", event.data, error);
       }
@@ -38,21 +37,7 @@ export function EventsController({ onDataUpdate }) {
     };
   }, [onDataUpdate]);
 
-  return (
-    <div>
-        <h2>Received Data</h2>
-        {console.log("data: ", data[0].id)}
-        <div>
-          {data.map((event) => (
-            <div key={event.id}>
-              <div>{event.id}</div>
-              <div>{event.campaign}</div>
-              <div>{event.action}</div>
-            </div>
-          ))}
-        </div>
-    </div>
-  );
+  return (data) ? (data.id) : null;
 }
 
 export default EventsController;
