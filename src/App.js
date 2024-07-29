@@ -4,7 +4,6 @@ import { ApiResponseComponent } from "./handlers/ApiResponseComponent";
 import { GoogleResponseComponent } from "./handlers/GoogleResponseComponent";
 import { PlannerbookForm } from "./forms/PlannerbookForm";
 import { EventsController } from "./handlers/EventsController";
-import { EventIdDisplayComponent } from "./handlers/EventIdDisplayComponent"; // Assuming you have this component
 
 function useApiResponse() {
   const [apiResponseData, setApiResponseData] = useState(null);
@@ -17,11 +16,11 @@ function useApiResponse() {
 
 function App() {
   const { apiResponseData, handleFormSubmit } = useApiResponse();
-  const [eventId, setEventId] = useState(null);
+  const [eventMap, setEventMap] = useState(null);
 
   const handleDataUpdate = (eventData) => {
-    if (eventData && eventData.id) {
-      setEventId(eventData.id);
+    if (eventData) {
+      setEventMap(eventData);
     }
   };
 
@@ -31,7 +30,6 @@ function App() {
       <GoogleResponseComponent data={apiResponseData} />
       <PlannerbookForm onSubmit={handleFormSubmit} />
       <EventsController onDataUpdate={handleDataUpdate} />
-      <EventIdDisplayComponent eventId={eventId} />
     </>
   );
 }
@@ -46,10 +44,6 @@ GoogleResponseComponent.propTypes = {
 
 PlannerbookForm.propTypes = {
   onSubmit: PropTypes.func.isRequired,
-};
-
-EventIdDisplayComponent.propTypes = {
-  eventId: PropTypes.string, // Assuming eventId is a string
 };
 
 export default App;

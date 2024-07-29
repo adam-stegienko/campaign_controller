@@ -37,7 +37,16 @@ export function EventsController({ onDataUpdate }) {
     };
   }, [onDataUpdate]);
 
-  return (data) ? (data.id) : null;
+  return (
+    data ? (
+      <div>
+        <h2>Event Data</h2>
+        <div>ID: {data.id}</div>
+        <div>Campaign: {data.campaign}</div>
+        <div>Action: {data.action}</div>
+      </div>
+    ) : null
+  );
 }
 
 export default EventsController;
