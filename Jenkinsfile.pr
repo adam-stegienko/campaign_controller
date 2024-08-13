@@ -1,0 +1,97 @@
+def cleanGit() {
+    sh 'git fetch --all'
+    sh 'git reset --hard'
+    sh 'git clean -fdx'
+}
+
+pipeline {
+    agent any
+    environment {
+        APP_NAME = 'campaign_controller'
+        SONAR_SERVER = 'LabSonarQube'
+        SONAR_PROJECT_NAME = 'campaign_controller'
+        SONAR_PROJECT_KEY = 'campaign_controller'
+        SONAR_SOURCES = './src'
+        SONAR_SONAR_LOGIN = 'adam-stegienko'
+        DOCKER_REGISTRY = 'registry.stegienko.com:8443'
+    }
+    options {
+        timestamps()
+    }
+    tools {
+        nodejs 'NodeJS' // Ensure NodeJS is installed and configured in Jenkins
+        dockerTool '26.1.1'
+    }
+    stages {
+
+        stage('Start') {
+            steps {
+                script {
+                    step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Pipeline started"]])
+                    step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: "Build started", state: "PENDING"]]]])
+                }
+            }
+        }
+
+        stage('Clean Workspace') {
+            steps {
+                sshagent(['jenkins_github_np']) {
+                    cleanGit()
+                }
+            }
+        }
+
+        stage('SonarQube analysis') {
+            steps {
+                withSonarQubeEnv(env.SONAR_SERVER) {
+                    sh "sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.sources=${env.SONAR_SOURCES}"
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            when {
+                expression {
+                    return currentBuild.currentResult == 'SUCCESS'
+                }
+            }
+            steps {
+                script {
+                    APP_VERSION = sh(script: 'npm version --json | jq -r .version', returnStdout: true).trim()
+                }
+                sh "docker build --build-arg APP_VERSION=${APP_VERSION} -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${APP_VERSION} ."
+            }
+        }
+
+        stage('Docker Image Security Scan') {
+            when {
+                expression {
+                   return currentBuild.currentResult == 'SUCCESS'
+                }
+            }
+            steps {
+                sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${APP_VERSION}"
+            }
+        }
+    }
+    post {
+        always {
+            script {
+                if (currentBuild.currentResult == 'SUCCESS') {
+                    step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "BetterThanOrEqualBuildResult", message: "Build succeeded", state: "SUCCESS"]]]])
+                    step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Build succeeded"]])
+                } else if (currentBuild.currentResult == 'FAILURE') {
+                    step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "BetterThanOrEqualBuildResult", message: "Build failed", state: "FAILURE"]]]])
+                    step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Build failed"]])
+                } else {
+                    step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: "Build aborted. Result: ${currentBuild.currentResult}", state: "ERROR"]]]])
+                    step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Build aborted. Result: ${currentBuild.currentResult}"]])
+                }
+            }
+            emailext body: "Build ${currentBuild.currentResult}: Job ${env.JOB_NAME} build ${env.BUILD_NUMBER}\nMore info at: ${env.BUILD_URL}",
+                 from: 'jenkins+blueflamestk@gmail.com',
+                 subject: "${currentBuild.currentResult}: Job '${env.JOB_NAME}' (${env.BUILD_NUMBER})",
+                 to: 'adam.stegienko1@gmail.com'
+        }
+    }
+}
