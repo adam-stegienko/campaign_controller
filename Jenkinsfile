@@ -116,10 +116,11 @@ pipeline {
 
         stage('SonarQube analysis') {
             steps {
-                withMaven() {
-                    withSonarQubeEnv(env.SONAR_SERVER) {
-                        sh "mvn sonar:sonar -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}'"
-                    }
+                script {
+                    scannerHome = tool "${env.SONAR_SERVER}"
+                }
+                withSonarQubeEnv(env.SONAR_SERVER) {// If you have configured more than one global server connection, you can specify its name as configured in Jenkins
+                sh "${scannerHome}/bin/sonar-scanner"
                 }
             }
         }
