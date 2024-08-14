@@ -49,8 +49,8 @@ RUN chown -R appuser:appgroup /etc/nginx
 # Expose port 8000
 EXPOSE 8000
 
-# Switch to the non-root user
-USER appuser
+# # Switch to the non-root user
+# USER appuser
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
