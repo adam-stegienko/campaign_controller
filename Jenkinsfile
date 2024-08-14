@@ -42,6 +42,8 @@ pipeline {
         timestamps()
     }
     tools {
+        maven 'Maven'
+        jdk 'JDK'
         dockerTool '26.1.1'
     }
     stages {
@@ -114,12 +116,13 @@ pipeline {
 
         stage('SonarQube analysis') {
             steps {
-                withSonarQubeEnv(env.SONAR_SERVER) {
-                    sh "sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.sources=${env.SONAR_SOURCES}"
+                withMaven() {
+                    withSonarQubeEnv(env.SONAR_SERVER) {
+                        sh "mvn sonar:sonar -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}'"
+                    }
                 }
             }
         }
-
 
         stage('Docker Build') {
             when {
