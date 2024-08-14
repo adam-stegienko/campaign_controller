@@ -42,7 +42,6 @@ pipeline {
         timestamps()
     }
     tools {
-        nodejs 'NodeJS' // Ensure NodeJS is installed and configured in Jenkins
         dockerTool '26.1.1'
     }
     stages {
