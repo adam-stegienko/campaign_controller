@@ -75,7 +75,7 @@ pipeline {
                     submoduleCfg: [],
                     userRemoteConfigs: [[
                         credentialsId: 'jenkins_github_np',
-                        url: 'git@github.com:adam-stegienko/campaign_controller_api.git'
+                        url: 'git@github.com:adam-stegienko/campaign_controller.git'
                     ]]
                 ])
             }
