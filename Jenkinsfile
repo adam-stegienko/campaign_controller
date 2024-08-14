@@ -88,11 +88,7 @@ pipeline {
                     try {
                         latestTag = sh(returnStdout: true, script: 'git tag | sort -Vr | head -n 1').trim()
                     } catch (Exception e) {}
-                    if (latestTag != null) {
-                        env.APP_VERSION = calculateVersion(latestTag)
-                    } else {
-                        env.APP_VERSION = calculateVersion('0.0.0')
-                    }
+                    env.APP_VERSION = calculateVersion(latestTag)
 
                     // Check if the latest commit already has a tag
                     def latestCommitTag = ''
