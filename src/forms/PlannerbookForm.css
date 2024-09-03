@@ -1,0 +1,80 @@
+.form-border {
+    font-family: 'Arial', sans-serif;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.form {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+    box-sizing: border-box;
+}
+
+.form-title {
+    text-align: center;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.form-select,
+.form-input,
+.form-button {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+
+.form-select:focus,
+.form-input:focus {
+    border-color: #000000;
+    outline: none;
+    box-shadow: 0 0 5px rgba(54, 54, 54, 0.5);
+}
+
+.all-form-buttons {
+    display: flex;
+}
+
+.form-button {
+    background-color: #1f558b;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-size: 18px;
+    margin: 5px;
+}
+
+.form-button:hover {
+    background-color: #5d5c5f;
+}
+
+.create-button-form {
+    background-color: #1f558b;
+    width: 90px;
+    font-size: 16px;
+    float: right;
+    margin: 20px;
+}
+
+.cancel-button-form {
+    background-color: #808080;
+    width: 50%;
+}
+
+.form-error {
+    color: red;
+    font-size: 14px;
+    margin-top: -10px;
+    margin-bottom: 10px;
+}

@@ -50,7 +50,7 @@ export function ApiResponseComponent() {
   };
 
   return (
-    <div>
+    <div className="table-container">
       {data && data.length > 0 ? (
         <table className="table-responsive">
           <thead>
@@ -75,7 +75,7 @@ export function ApiResponseComponent() {
           </tbody>
         </table>
       ) : (
-        <div>No data found</div>
+        <div className="no-data">No data found</div>
       )}
     </div>
   );
