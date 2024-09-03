@@ -1,10 +1,21 @@
 import React, { useState, useRef } from "react";
+import "./PlannerbookForm.css";
 
 export function PlannerbookForm({ onSubmit }) {
   const [executionDateValid, setExecutionDateValid] = useState(true);
   const formRef = useRef(null); // Step 1: Create a ref for the form
   const url =
     process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL + "/v1/api/plannerbooks";
+
+  const [isFormVisible, setFormVisible] = useState(false);
+
+  const handleCreateClick = () => {
+    setFormVisible(true);
+  };
+
+  const handleCloseForm = () => {
+    setFormVisible(false);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -40,38 +51,71 @@ export function PlannerbookForm({ onSubmit }) {
       formRef.current.reset(); // Step 2: Reset the form after successful submission
       // Refresh the page after successful submission
       window.location.reload();
+      handleCloseForm();
     } catch (error) {
       console.error("Error submitting form:", error);
     }
   };
+  const handleCancelClick = async (event) => {
+    event.preventDefault();
+    handleCloseForm();
+  };
 
   return (
-    <form onSubmit={handleSubmit} ref={formRef}>
-      {" "}
-      {/* Step 3: Attach the ref to the form */}
-      <select name="campaign" required>
-        <option value="">Select Campaign</option>
-        <option value="Przeprowadzki">Przeprowadzki</option>
-        <option value="Magazynowanie">Magazynowanie</option>
-        <option value="Transport">Transport</option>
-      </select>
-      <select name="action" required>
-        <option value="">Select Action</option>
-        <option value="Enable">Enable</option>
-        <option value="Disable">Disable</option>
-      </select>
-      <input
-        type="datetime-local"
-        name="executionDate"
-        placeholder="Execution Date"
-        required
-        onChange={() => setExecutionDateValid(true)}
-      />
-      {!executionDateValid && (
-        <p style={{ color: "red" }}>Execution date cannot be in the past.</p>
+    <>
+      {!isFormVisible && (
+        <button
+          className="form-button create-button-form"
+          onClick={handleCreateClick}
+        >
+          Create
+        </button>
       )}
-      <button type="submit">Submit</button>
-    </form>
+      {isFormVisible && (
+        <div className="form-border">
+          <form class="form" onSubmit={handleSubmit} ref={formRef}>
+            <h2 class="form-title">Manage Campaign</h2>
+            <select class="form-select" name="campaign" required>
+              <option value="" disabled selected>
+                --Select Campaign--
+              </option>
+              <option value="Przeprowadzki">Przeprowadzki</option>
+              <option value="Transport">Transport</option>
+              <option value="Magazynowanie">Magazynowanie</option>
+            </select>
+            <select class="form-select" name="action" required>
+              <option value="" disabled selected>
+                --Select Action--
+              </option>
+              <option value="Enable">Enable</option>
+              <option value="Disable">Disable</option>
+            </select>
+            <input
+              class="form-input"
+              type="datetime-local"
+              name="executionDate"
+              placeholder="Execution Date"
+              required
+              onChange={() => setExecutionDateValid(true)}
+            />
+            {!executionDateValid && (
+              <p class="form-error">Execution date cannot be in the past.</p>
+            )}
+            <div className="all-form-buttons">
+              <button class="form-button" type="submit">
+                Submit
+              </button>
+              <button
+                class="form-button cancel-button-form"
+                onClick={handleCancelClick}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   );
 }
 
