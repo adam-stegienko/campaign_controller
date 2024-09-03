@@ -68,7 +68,7 @@ export function PlannerbookForm({ onSubmit }) {
           className="form-button create-button-form"
           onClick={handleCreateClick}
         >
-          Stwórz
+          Create
         </button>
       )}
       {isFormVisible && (
