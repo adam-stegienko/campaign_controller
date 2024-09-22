@@ -4,8 +4,15 @@ import "./ApiResponseComponent.css";
 export function ApiResponseComponent() {
   const [data, setData] = useState([]);
 
+  let base_url;
+  if (process.env.NODE_ENV === "development") {
+    base_url = "http://localhost:8099";
+  } else {
+    base_url = "https://campaign-controller.stegienko.com:8443";
+  }
+
   useEffect(() => {
-    const url = `${process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL}/v1/api/plannerbooks`;
+    const url = `${base_url}/v1/api/plannerbooks`;
     fetch(url)
       .then((response) => {
         if (!response.ok) {
@@ -36,7 +43,7 @@ export function ApiResponseComponent() {
   // Function to handle delete action
   const handleDelete = (id) => {
     if (window.confirm("Are you sure you want to delete the entry?")) {
-      const url = `${process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL}/v1/api/plannerbooks/${id}`;
+      const url = `${base_url}/v1/api/plannerbooks/${id}`;
       fetch(url, { method: "DELETE" })
         .then((response) => {
           if (!response.ok) {

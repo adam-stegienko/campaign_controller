@@ -3,8 +3,15 @@ import { useState, useEffect } from "react";
 export function EventsController({ onDataUpdate }) {
   const [data, setData] = useState(null);
 
+  let base_url;
+  if (process.env.NODE_ENV === "development") {
+    base_url = "http://localhost:8099";
+  } else {
+    base_url = "https://campaign-controller.stegienko.com:8443";
+  }
+
   useEffect(() => {
-    const subscribeEventsUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL + "/events";
+    const subscribeEventsUrl = `${base_url}/events`;
     const eventSource = new EventSource(subscribeEventsUrl);
 
     eventSource.onopen = () => {
