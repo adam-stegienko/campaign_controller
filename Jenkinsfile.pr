@@ -14,12 +14,14 @@ pipeline {
         SONAR_SOURCES = './src'
         SONAR_SONAR_LOGIN = 'adam-stegienko'
         DOCKER_REGISTRY = 'registry.stegienko.com:8443'
+        REACT_APP_CAMPAIGN_CONTROLLER_API_URL = 'https://campaign-controller-api.stegienko.com'
     }
     options {
         timestamps()
     }
     tools {
-        nodejs 'NodeJS' // Ensure NodeJS is installed and configured in Jenkins
+        maven 'Maven'
+        jdk 'JDK'
         dockerTool '26.1.1'
     }
     stages {
@@ -43,11 +45,15 @@ pipeline {
 
         stage('SonarQube analysis') {
             steps {
-                withSonarQubeEnv(env.SONAR_SERVER) {
-                    sh "sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.sources=${env.SONAR_SOURCES}"
+                script {
+                    scannerHome = tool 'JenkinsSonarScanner'
+                }
+                withSonarQubeEnv(env.SONAR_SERVER) {// If you have configured more than one global server connection, you can specify its name as configured in Jenkins
+                sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}'"
                 }
             }
         }
+
 
         stage('Docker Build') {
             when {
@@ -57,9 +63,9 @@ pipeline {
             }
             steps {
                 script {
-                    APP_VERSION = sh(script: 'npm version --json | jq -r .version', returnStdout: true).trim()
+                    APP_VERSION = sh(script: 'git log --pretty=format:"%h" -n 1', returnStdout: true).trim()
                 }
-                sh "docker build --build-arg APP_VERSION=${APP_VERSION} -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${APP_VERSION} ."
+                sh "docker build --build-arg APP_VERSION=${APP_VERSION} --build-arg=REACT_APP_CAMPAIGN_CONTROLLER_API_URL=${REACT_APP_CAMPAIGN_CONTROLLER_API_URL} -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${APP_VERSION} ."
             }
         }
 
