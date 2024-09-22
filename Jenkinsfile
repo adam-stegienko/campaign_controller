@@ -194,7 +194,7 @@ networks:
 
 EOF
                     """
-                    sh "docker compose up -d --remove-orphans"
+                    sh "docker compose up -d --remove-orphans --force-recreate"
                 }
             }
         }
