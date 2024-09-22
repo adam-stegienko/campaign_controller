@@ -4,8 +4,7 @@ import "./PlannerbookForm.css";
 export function PlannerbookForm({ onSubmit }) {
   const [executionDateValid, setExecutionDateValid] = useState(true);
   const formRef = useRef(null); // Step 1: Create a ref for the form
-  const url =
-    process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL + "/v1/api/plannerbooks";
+  const url = "/v1/api/plannerbooks";
 
   const [isFormVisible, setFormVisible] = useState(false);
 
