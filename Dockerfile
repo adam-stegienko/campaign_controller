@@ -26,7 +26,10 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve the React application using a lightweight web server
-FROM nginx:alpine
+FROM nginx:1.27-alpine
+
+ARG REACT_APP_CAMPAIGN_CONTROLLER_API_URL
+ENV REACT_APP_CAMPAIGN_CONTROLLER_API_URL=$REACT_APP_CAMPAIGN_CONTROLLER_API_URL
 
 # Create a non-root user and group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
