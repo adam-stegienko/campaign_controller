@@ -4,7 +4,13 @@ import "./PlannerbookForm.css";
 export function PlannerbookForm({ onSubmit }) {
   const [executionDateValid, setExecutionDateValid] = useState(true);
   const formRef = useRef(null); // Step 1: Create a ref for the form
-  const url = "/v1/api/plannerbooks";
+
+  let url;
+  if (process.env.NODE_ENV === "development") {
+    url = "http://localhost:3000/v1/api/plannerbooks";
+  } else {
+    url = "/v1/api/plannerbooks";
+  }
 
   const [isFormVisible, setFormVisible] = useState(false);
 
