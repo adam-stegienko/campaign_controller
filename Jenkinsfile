@@ -37,7 +37,7 @@ pipeline {
         SONAR_SOURCES = './src'
         SONAR_SONAR_LOGIN = 'adam-stegienko'
         DOCKER_REGISTRY = 'registry.stegienko.com:8443'
-        REACT_APP_CAMPAIGN_CONTROLLER_API_URL = 'https://campaign-controller-api.stegienko.com'
+        REACT_APP_CAMPAIGN_CONTROLLER_API_URL = 'https://campaign-controller.stegienko.com:8443'
     }
     options {
         timestamps()
