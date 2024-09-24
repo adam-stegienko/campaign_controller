@@ -14,6 +14,9 @@ export function PlannerbookForm({ onSubmit }) {
 
   const url = `${base_url}/v1/api/plannerbooks`;
 
+  // REACT_APP_CAMPAIGN_TYPES=["Przeprowadzki", "Transport", "Magazynowanie"]
+  const campaignNames = process.env.REACT_APP_CAMPAIGN_TYPES ? process.env.REACT_APP_CAMPAIGN_TYPES.split(",") : [];
+
   const [isFormVisible, setFormVisible] = useState(false);
 
   const handleCreateClick = () => {
@@ -86,9 +89,12 @@ export function PlannerbookForm({ onSubmit }) {
               <option value="" disabled selected>
                 --Select Campaign--
               </option>
-              <option value="Przeprowadzki">Przeprowadzki</option>
+              {/* <option value="Przeprowadzki">Przeprowadzki</option>
               <option value="Transport">Transport</option>
-              <option value="Magazynowanie">Magazynowanie</option>
+              <option value="Magazynowanie">Magazynowanie</option> */}
+              {campaignNames.map((campaign, index) => (
+                <option key={index} value={campaign}>{campaign}</option>
+              ))}
             </select>
             <select class="form-select" name="action" required>
               <option value="" disabled selected>

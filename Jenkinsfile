@@ -38,6 +38,7 @@ pipeline {
         SONAR_SONAR_LOGIN = 'adam-stegienko'
         DOCKER_REGISTRY = 'registry.stegienko.com:8443'
         REACT_APP_CAMPAIGN_CONTROLLER_API_URL = 'https://campaign-controller.stegienko.com:8443'
+        REACT_APP_CAMPAIGN_TYPES = 'Przeprowadzki,Magazynowanie,Transport'
     }
     options {
         timestamps()
@@ -133,7 +134,7 @@ pipeline {
                 }
             }
             steps {
-                sh "docker build --build-arg APP_VERSION=${env.APP_VERSION} --build-arg REACT_APP_CAMPAIGN_CONTROLLER_API_URL=${env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL} -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION} ."
+                sh "docker build --build-arg APP_VERSION=${env.APP_VERSION} --build-arg REACT_APP_CAMPAIGN_CONTROLLER_API_URL=${env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL} --build-arg REACT_APP_CAMPAIGN_TYPES=${env.REACT_APP_CAMPAIGN_TYPES} -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION} ."
             }
         }
 
