@@ -1,36 +1,31 @@
 import React, { useState, useEffect } from "react";
 import "./GoogleResponseComponent.css";
-
 import { GoogleAdsApi } from "google-ads-api";
 
 export function GoogleResponseComponent() {
   const [data, setData] = useState([]);
 
-  const googleAdsApi = new GoogleAdsApi({
-    client_id: process.env.REACT_APP_CLIENT_ID,
-    client_secret: process.env.REACT_APP_CLIENT_SECRET,
-    developer_token: process.env.REACT_APP_DEVELOPER_TOKEN,
-    refresh_token: process.env.REACT_APP_REFRESH_TOKEN,
-  });
-
-  let customer = googleAdsApi.Customer;
-
-  // print campaign statuses
-  customer.campaigns.list()
-    .then((campaigns) => {
-      campaigns.forEach((campaign) => {
-        console.log(campaign.id, campaign.name, campaign.status);
-      });
-      console.log("Campaigns fetched successfully");
-    })
-    .catch((error) => {
-      console.error("Error fetching campaigns:", error);
+  useEffect(() => {
+    const googleAdsApi = new GoogleAdsApi({
+      client_id: process.env.REACT_APP_CLIENT_ID,
+      client_secret: process.env.REACT_APP_CLIENT_SECRET,
+      developer_token: process.env.REACT_APP_DEVELOPER_TOKEN,
+      refresh_token: process.env.REACT_APP_REFRESH_TOKEN,
     });
 
-  useEffect(() => {
-    // fetch Google data
+    const customer = googleAdsApi.Customer({
+      customer_id: process.env.REACT_APP_CUSTOMER_ID,
+    });
+
+    // Fetch campaign statuses and log them
     customer.campaigns.list()
       .then((campaigns) => {
+        campaigns.forEach((campaign) => {
+          console.log(`Campaign ID: ${campaign.id}, Name: ${campaign.name}, Status: ${campaign.status}`);
+        });
+        console.log("Campaigns fetched successfully");
+
+        // Set the data to state if you want to display it in the component
         const campaignData = campaigns.map((campaign) => ({
           id: campaign.id,
           campaign: campaign.name,
