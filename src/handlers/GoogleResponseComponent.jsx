@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./GoogleResponseComponent.css";
-import { GoogleAdsApi } from "google-ads-api";
+// import { GoogleAdsApi, ResourceNames, errors } from "google-ads-api";
+// import { google } from "googleapis";
 
 export function GoogleResponseComponent() {
   const [data, setData] = useState([]);
@@ -9,33 +10,14 @@ export function GoogleResponseComponent() {
 
   useEffect(() => {
     const fetchCampaigns = async () => {
+      
       try {
-        console.log(`REACT_APP_CLIENT_ID: ${process.env.REACT_APP_CLIENT_ID}`);
-        console.log(`REACT_APP_CLIENT_SECRET: ${process.env.REACT_APP_CLIENT_SECRET}`);
-        console.log(`REACT_APP_DEVELOPER_TOKEN: ${process.env.REACT_APP_DEVELOPER_TOKEN}`);
-        console.log(`REACT_APP_CUSTOMER_ID: ${process.env.REACT_APP_CUSTOMER_ID}`);
-        console.log(`REACT_APP_REFRESH_TOKEN: ${process.env.REACT_APP_REFRESH_TOKEN}`);
+        const campaigns = [
+          { id: 1, name: "Przeprowadzki", status: "Enabled" },
+          { id: 2, name: "Magazynowanie", status: "Enabled" },
+          { id: 3, name: "Transport", status: "Enabled" },
+        ];
 
-        const googleAdsApi = new GoogleAdsApi({
-          client_id: process.env.REACT_APP_CLIENT_ID,
-          client_secret: process.env.REACT_APP_CLIENT_SECRET,
-          developer_token: process.env.REACT_APP_DEVELOPER_TOKEN,
-        });
-
-        try {
-          const customers = await googleAdsApi.listAccessibleCustomers(process.env.REACT_APP_REFRESH_TOKEN);
-          console.log("Customers fetched successfully");
-          console.log(customers);
-        } catch (error) {
-          console.error("Error fetching customers:", error);
-        }
-
-        const customer = googleAdsApi.Customer({
-          customer_id: process.env.REACT_APP_CUSTOMER_ID,
-          refresh_token: process.env.REACT_APP_REFRESH_TOKEN,
-        });
-
-        const campaigns = await customer.campaigns.list();
         campaigns.forEach((campaign) => {
           console.log(`Campaign ID: ${campaign.id}, Name: ${campaign.name}, Status: ${campaign.status}`);
         });
