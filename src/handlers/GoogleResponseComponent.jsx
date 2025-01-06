@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
 import "./GoogleResponseComponent.css";
-// import { GoogleAdsApi, ResourceNames, errors } from "google-ads-api";
-// import { google } from "googleapis";
 
 export function GoogleResponseComponent() {
   const [data, setData] = useState([]);
@@ -10,13 +8,17 @@ export function GoogleResponseComponent() {
 
   useEffect(() => {
     const fetchCampaigns = async () => {
-      
+      const baseUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+      const customerId = process.env.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
+      const campaignNames = process.env.REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES;
+      const url = `${baseUrl}/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
+
       try {
-        const campaigns = [
-          { id: 1, name: "Przeprowadzki", status: "Enabled" },
-          { id: 2, name: "Magazynowanie", status: "Enabled" },
-          { id: 3, name: "Transport", status: "Enabled" },
-        ];
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const campaigns = await response.json();
 
         campaigns.forEach((campaign) => {
           console.log(`Campaign ID: ${campaign.id}, Name: ${campaign.name}, Status: ${campaign.status}`);
