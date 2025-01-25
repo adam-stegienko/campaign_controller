@@ -38,6 +38,8 @@ pipeline {
         SONAR_SONAR_LOGIN = 'adam-stegienko'
         DOCKER_REGISTRY = 'registry.stegienko.com:8443'
         REACT_APP_CAMPAIGN_CONTROLLER_API_URL = 'https://campaign-controller.stegienko.com:8443'
+        REACT_APP_GOOGLE_ADS_CUSTOMER_ID = '5898340090'
+        REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES = 'Przeprowadzki,Transport,Magazynowanie'
     }
     options {
         timestamps()
@@ -133,7 +135,7 @@ pipeline {
                 }
             }
             steps {
-                sh "docker build --build-arg APP_VERSION=${env.APP_VERSION} --build-arg REACT_APP_CAMPAIGN_CONTROLLER_API_URL=${env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL} -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION} ."
+                sh "docker build --build-arg APP_VERSION=${env.APP_VERSION} --build-arg REACT_APP_CAMPAIGN_CONTROLLER_API_URL=${env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL} --build-arg REACT_APP_GOOGLE_ADS_CUSTOMER_ID=${env.REACT_APP_GOOGLE_ADS_CUSTOMER_ID} --build-arg REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES=${env.REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES} -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION} ."
             }
         }
 
@@ -174,6 +176,7 @@ pipeline {
             steps {
                 script {
                     sh """
+                    docker rm -rf ${APP_NAME}
                     cat > docker-compose.yml <<EOF
 version: '3'
 
