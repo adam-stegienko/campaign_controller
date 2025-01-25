@@ -3,24 +3,52 @@ import "./GoogleResponseComponent.css";
 
 export function GoogleResponseComponent() {
   const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Correct path for fetching from the public directory
-    const localFile = process.env.PUBLIC_URL + "/data/google_data.json";
-    fetch(localFile)
-      .then((response) => {
+    const fetchCampaigns = async () => {
+      const baseUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+      const customerId = process.env.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
+      const campaignNames = process.env.REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES;
+      const url = `${baseUrl}/v1/api/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
+
+      try {
+        const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(
-            `Failed to load local data with status: ${response.status}`
-          );
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
-        return response.json();
-      })
-      .then((data) => {
-        setData(data);
-      })
-      .catch((error) => console.error("Error fetching Google data:", error));
+        const campaigns = await response.json();
+
+        campaigns.forEach((campaign) => {
+          console.log(`Campaign ID: ${campaign.id}, Name: ${campaign.name}, Status: ${campaign.status}`);
+        });
+        console.log("Campaigns fetched successfully");
+
+        const campaignData = campaigns.map((campaign) => ({
+          id: campaign.id,
+          campaign: campaign.name,
+          state: campaign.status,
+        }));
+        setData(campaignData);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching campaigns:", error);
+        setError(error);
+        setLoading(false);
+      }
+    };
+
+    fetchCampaigns();
   }, []);
+
+  if (loading) {
+    return <div>Loading Google data...</div>;
+  }
+
+  if (error) {
+    return <div>Error fetching Google data: {error.message}</div>;
+  }
 
   return (
     <div className="google-container">
@@ -42,7 +70,7 @@ export function GoogleResponseComponent() {
           </tbody>
         </table>
       ) : (
-        <div>Loading Google data...</div>
+        <div>No data available</div>
       )}
     </div>
   );
