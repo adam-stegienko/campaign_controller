@@ -11,7 +11,7 @@ export function GoogleResponseComponent() {
       const baseUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
       const customerId = process.env.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
       const campaignNames = process.env.REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES;
-      const url = `${baseUrl}/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
+      const url = `${baseUrl}/v1/api/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
 
       try {
         const response = await fetch(url);
