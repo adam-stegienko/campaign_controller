@@ -176,7 +176,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker rm -rf ${APP_NAME}
+                    docker rm -f ${APP_NAME}
                     cat > docker-compose.yml <<EOF
 version: '3'
 
