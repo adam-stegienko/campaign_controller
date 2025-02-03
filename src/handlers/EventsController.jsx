@@ -1,24 +1,45 @@
 import { useState, useEffect } from "react";
+import axios from "axios";
 
 export function EventsController({ onDataUpdate }) {
   const [data, setData] = useState(null);
-  const base_url = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+  const baseUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+  const customerId = process.env.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
 
   useEffect(() => {
-    const subscribeEventsUrl = `${base_url}/events`;
+    const subscribeEventsUrl = `${baseUrl}/events`;
     const eventSource = new EventSource(subscribeEventsUrl);
 
     eventSource.onopen = () => {
       console.log("Connection opened");
     };
 
-    eventSource.onmessage = (event) => {
+    eventSource.onmessage = async (event) => {
       console.log("Received event", event);
       try {
         const newEvent = JSON.parse(event.data);
         setData(newEvent);
         onDataUpdate(newEvent);
         console.log("Parsed event data", newEvent);
+
+        // Process the event
+        if (newEvent.campaign) {
+          console.log(`Plannerbook is updating the campaign: ${newEvent.campaign}`);
+
+          // API call to update campaign
+          let campaignStatus = newEvent.action === 1 ? "ENABLED" : "PAUSED";
+          const updateResponse = await axios.put(`${baseUrl}/v1/api/google-ads/campaigns/status/${newEvent.campaign}?customerId=${customerId}&status=${campaignStatus}`, { status: newEvent.campaign.status });
+
+          if (updateResponse.status >= 200 && updateResponse.status < 300) {
+            console.log("Campaign update successful. Plannerbook is going to be deleted now.");
+
+            // Delete the plannerbook
+            await axios.delete(`${baseUrl}/v1/api/plannerbooks/${newEvent.id}`);
+            console.log("Plannerbook deleted successfully.");
+          } else {
+            console.error("Failed to update campaign:", updateResponse);
+          }
+        }
       } catch (error) {
         console.error("Error parsing event data:", event.data, error);
       }
@@ -36,7 +57,7 @@ export function EventsController({ onDataUpdate }) {
       eventSource.close();
       console.log("EventSource closed");
     };
-  }, [onDataUpdate]);
+  }, [onDataUpdate, baseUrl]);
 
   return (
     data ? (
