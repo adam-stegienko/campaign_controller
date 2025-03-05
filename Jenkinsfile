@@ -48,6 +48,7 @@ pipeline {
         maven 'Maven'
         jdk 'JDK'
         dockerTool '26.1.1'
+        nodejs 'NodeJS'
     }
     stages {
 
