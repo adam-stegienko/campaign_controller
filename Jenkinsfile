@@ -55,6 +55,7 @@ pipeline {
         stage('Start') {
             steps {
                 script {
+                    step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Pipeline started"]])
                     step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: "Build started", state: "PENDING"]]]])
                 }
             }
@@ -168,41 +169,6 @@ pipeline {
             }
         }
 
-        stage('Deploy Application to Docker') {
-            when {
-                expression {
-                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false'
-                }
-            }
-            steps {
-                script {
-                    sh """
-                    docker rm -f ${APP_NAME}
-                    cat > docker-compose.yml <<EOF
-version: '3'
-
-services:
-  ${APP_NAME}:
-    image: ${DOCKER_REGISTRY}/${APP_NAME}:${APP_VERSION}
-    hostname: ${APP_NAME}
-    container_name: ${APP_NAME}
-    ports:
-      - "8089:8000"
-    restart: always
-    networks:
-      - ${APP_NAME}_network
-
-networks:
-  ${APP_NAME}_network:
-    driver: bridge
-
-EOF
-                    """
-                    sh "docker compose up -d --remove-orphans --force-recreate"
-                }
-            }
-        }
-
         stage('Update version, Tag, and Push to Git') {
             when {
                 expression {
@@ -225,18 +191,43 @@ EOF
     post {
         always {
             script {
-                if (currentBuild.currentResult == 'SUCCESS') {
-                    step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "BetterThanOrEqualBuildResult", message: "Build succeeded", state: "SUCCESS"]]]])
-                } else if (currentBuild.currentResult == 'FAILURE'){
-                    step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "BetterThanOrEqualBuildResult", message: "Build failed", state: "FAILURE"]]]])
-                } else {
-                    step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "BetterThanOrEqualBuildResult", message: "Build aborted", state: "ERROR"]]]])
+                try {
+                    if (currentBuild.currentResult == 'SUCCESS') {
+                        step([$class: "GitHubCommitStatusSetter", statusResultSource: [
+                            $class: "ConditionalStatusResultSource",
+                            results: [[$class: "BetterThanOrEqualBuildResult", message: "Build succeeded", state: "SUCCESS"]]
+                        ]])
+                        step([$class: "githubPRStatusPublisher",
+                            statusMsg: [content: "Build succeeded"],
+                            unstableAs: "SUCCESS"
+                        ])
+                    } else if (currentBuild.currentResult == 'FAILURE') {
+                        step([$class: "GitHubCommitStatusSetter", statusResultSource: [
+                            $class: "ConditionalStatusResultSource",
+                            results: [[$class: "BetterThanOrEqualBuildResult", message: "Build failed", state: "FAILURE"]]
+                        ]])
+                        step([$class: "githubPRStatusPublisher",
+                            statusMsg: [content: "Build failed"],
+                            unstableAs: "FAILURE"
+                        ])
+                    } else {
+                        step([$class: "GitHubCommitStatusSetter", statusResultSource: [
+                            $class: "ConditionalStatusResultSource",
+                            results: [[$class: "AnyBuildResult", message: "Build aborted. Result: ${currentBuild.currentResult}", state: "ERROR"]]
+                        ]])
+                        step([$class: "githubPRStatusPublisher",
+                            statusMsg: [content: "Build aborted. Result: ${currentBuild.currentResult}"],
+                            unstableAs: "ERROR"
+                        ])
+                    }
+                } catch (Exception e) {
+                    // Suppress/log nothing
                 }
             }
             emailext body: "Build ${currentBuild.currentResult}: Job ${env.JOB_NAME} build ${env.BUILD_NUMBER}\nMore info at: ${env.BUILD_URL}",
-                 from: 'jenkins+blueflamestk@gmail.com',
-                 subject: "${currentBuild.currentResult}: Job '${env.JOB_NAME}' (${env.BUILD_NUMBER})",
-                 to: 'adam.stegienko1@gmail.com'
+                from: 'jenkins+blueflamestk@gmail.com',
+                subject: "${currentBuild.currentResult}: Job '${env.JOB_NAME}' (${env.BUILD_NUMBER})",
+                to: 'adam.stegienko1@gmail.com'
         }
     }
 }
