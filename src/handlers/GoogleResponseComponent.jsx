@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import "./GoogleResponseComponent.css";
+import "../styles/GoogleResponseComponent.css";
+import Configuration from "../services/Configuration.jsx";
 
 export function GoogleResponseComponent() {
   const [data, setData] = useState([]);
@@ -8,12 +9,15 @@ export function GoogleResponseComponent() {
 
   useEffect(() => {
     const fetchCampaigns = async () => {
-      const baseUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
-      const customerId = process.env.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
-      const campaignNames = process.env.REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES;
-      const url = `${baseUrl}/v1/api/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
-
       try {
+        // Load configuration first
+        const cfg = await Configuration.loadConfig();
+
+        const baseUrl = cfg.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+        const customerId = cfg.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
+        const campaignNames = cfg.REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES;
+        const url = `${baseUrl}/v1/api/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
+
         const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

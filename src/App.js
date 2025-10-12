@@ -4,7 +4,7 @@ import { ApiResponseComponent } from "./handlers/ApiResponseComponent";
 import { GoogleResponseComponent } from "./handlers/GoogleResponseComponent";
 import { PlannerbookForm } from "./forms/PlannerbookForm";
 import { EventsController } from "./handlers/EventsController";
-import "./CSS/container.css"
+import "./styles/container.css"
 
 function useApiResponse() {
   const [apiResponseData, setApiResponseData] = useState(null);

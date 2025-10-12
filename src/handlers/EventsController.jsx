@@ -1,63 +1,83 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import Configuration from "../services/Configuration.jsx";
 
 export function EventsController({ onDataUpdate }) {
   const [data, setData] = useState(null);
-  const baseUrl = process.env.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
-  const customerId = process.env.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
+  const [config, setConfig] = useState(null);
 
   useEffect(() => {
-    const subscribeEventsUrl = `${baseUrl}/events`;
-    const eventSource = new EventSource(subscribeEventsUrl);
+    let eventSource = null;
 
-    eventSource.onopen = () => {
-      console.log("Connection opened");
-    };
-
-    eventSource.onmessage = async (event) => {
-      console.log("Received event", event);
+    const initializeAndSubscribe = async () => {
       try {
-        const newEvent = JSON.parse(event.data);
-        setData(newEvent);
-        onDataUpdate(newEvent);
-        console.log("Parsed event data", newEvent);
+        // Load configuration first
+        const cfg = await Configuration.loadConfig();
+        setConfig(cfg);
 
-        // Process the event
-        if (newEvent.campaign) {
-          console.log(`Plannerbook is updating the campaign: ${newEvent.campaign}`);
+        const baseUrl = cfg.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+        const customerId = cfg.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
+        const subscribeEventsUrl = `${baseUrl}/events`;
+        eventSource = new EventSource(subscribeEventsUrl);
 
-          // API call to update campaign
-          let campaignStatus = newEvent.action === 1 ? "ENABLED" : "PAUSED";
-          const updateResponse = await axios.put(`${baseUrl}/v1/api/google-ads/campaigns/status/${newEvent.campaign}?customerId=${customerId}&status=${campaignStatus}`, { status: newEvent.campaign.status });
+        eventSource.onopen = () => {
+          console.log("Connection opened");
+        };
 
-          if (updateResponse.status >= 200 && updateResponse.status < 300) {
-            console.log("Campaign update successful. Plannerbook is going to be deleted now.");
+        eventSource.onmessage = async (event) => {
+          console.log("Received event", event);
+          try {
+            const newEvent = JSON.parse(event.data);
+            setData(newEvent);
+            if (onDataUpdate) {
+              onDataUpdate(newEvent);
+            }
+            console.log("Parsed event data", newEvent);
 
-            // Delete the plannerbook
-            await axios.delete(`${baseUrl}/v1/api/plannerbooks/${newEvent.id}`);
-            console.log("Plannerbook deleted successfully.");
-          } else {
-            console.error("Failed to update campaign:", updateResponse);
+            // Process the event
+            if (newEvent.campaign) {
+              console.log(`Plannerbook is updating the campaign: ${newEvent.campaign}`);
+
+              // API call to update campaign
+              let campaignStatus = newEvent.action === 1 ? "ENABLED" : "PAUSED";
+              const updateResponse = await axios.put(`${baseUrl}/v1/api/google-ads/campaigns/status/${newEvent.campaign}?customerId=${customerId}&status=${campaignStatus}`);
+
+              if (updateResponse.status >= 200 && updateResponse.status < 300) {
+                console.log("Campaign update successful. Plannerbook is going to be deleted now.");
+
+                // Delete the plannerbook
+                await axios.delete(`${baseUrl}/v1/api/plannerbooks/${newEvent.id}`);
+                console.log("Plannerbook deleted successfully.");
+              } else {
+                console.error("Failed to update campaign:", updateResponse);
+              }
+            }
+          } catch (error) {
+            console.error("Error parsing event data:", event.data, error);
           }
-        }
+        };
+
+        eventSource.onerror = (event) => {
+          console.log("EventSource error", event);
+          if (event.target.readyState === EventSource.CLOSED) {
+            console.log("EventSource closed with state: (" + event.target.readyState + ")");
+          }
+          eventSource.close();
+        };
       } catch (error) {
-        console.error("Error parsing event data:", event.data, error);
+        console.error("Error initializing EventsController:", error);
       }
     };
 
-    eventSource.onerror = (event) => {
-      console.log("EventSource error", event);
-      if (event.target.readyState === EventSource.CLOSED) {
-        console.log("EventSource closed with state: (" + event.target.readyState + ")");
-      }
-      eventSource.close();
-    };
+    initializeAndSubscribe();
 
     return () => {
-      eventSource.close();
-      console.log("EventSource closed");
+      if (eventSource) {
+        eventSource.close();
+        console.log("EventSource closed");
+      }
     };
-  }, [onDataUpdate, baseUrl]);
+  }, [onDataUpdate]);
 
   return (
     data ? (
