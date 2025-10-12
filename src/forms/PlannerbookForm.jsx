@@ -1,18 +1,17 @@
 import React, { useState, useRef } from "react";
 import "./PlannerbookForm.css";
+import Configuration from "../services/Configuration.jsx";
 
-export function PlannerbookForm({ onSubmit }) {
+export async function PlannerbookForm({ onSubmit }) {
   const [executionDateValid, setExecutionDateValid] = useState(true);
+  const [config, setConfig] = useState(null);
   const formRef = useRef(null); // Step 1: Create a ref for the form
 
-  let base_url;
-  if (process.env.NODE_ENV === "development") {
-    base_url = "http://localhost:8099";
-  } else {
-    base_url = "https://campaign-controller.stegienko.com:8443";
-  }
+  const cfg = await Configuration.loadConfig();
+  setConfig(cfg);
 
-  const url = `${base_url}/v1/api/plannerbooks`;
+  const baseUrl = cfg.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+  const url = `${baseUrl}/v1/api/plannerbooks`;
 
   const [isFormVisible, setFormVisible] = useState(false);
 
