@@ -40,9 +40,6 @@ COPY --from=build /app/build /usr/share/nginx/html
 # Change ownership of the web root directory
 RUN chown -R appuser:appgroup /usr/share/nginx/html
 
-# # Copy custom nginx configuration (optional)
-# COPY nginx/nginx.conf /etc/nginx/nginx.conf
-
 # Change ownership of the nginx configuration directory
 RUN chown -R appuser:appgroup /etc/nginx
 
