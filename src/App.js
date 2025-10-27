@@ -3,7 +3,6 @@ import PropTypes from "prop-types";
 import { ApiResponseComponent } from "./handlers/ApiResponseComponent";
 import { GoogleResponseComponent } from "./handlers/GoogleResponseComponent";
 import { PlannerbookForm } from "./forms/PlannerbookForm";
-import { EventsController } from "./handlers/EventsController";
 import "./styles/container.css"
 
 function useApiResponse() {
@@ -17,20 +16,12 @@ function useApiResponse() {
 
 function App() {
   const { apiResponseData, handleFormSubmit } = useApiResponse();
-  const [eventMap, setEventMap] = useState(null);
-
-  const handleDataUpdate = (eventData) => {
-    if (eventData) {
-      setEventMap(eventData);
-    }
-  };
 
   return (
     <div className="container">
       <ApiResponseComponent data={apiResponseData} />
       <GoogleResponseComponent data={apiResponseData} />
       <PlannerbookForm onSubmit={handleFormSubmit} />
-      <EventsController onDataUpdate={handleDataUpdate} />
     </div>
   );
 }

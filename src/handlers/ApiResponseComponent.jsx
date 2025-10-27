@@ -15,7 +15,7 @@ export function ApiResponseComponent() {
         const cfg = await Configuration.loadConfig();
         setConfig(cfg);
 
-        const baseUrl = cfg.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+        const baseUrl = cfg.REACT_APP_CAMPAIGN_CONTROLLER_API_REST_URL;
         const url = `${baseUrl}/v1/api/plannerbooks`;
         
         const response = await fetch(url);
@@ -54,7 +54,7 @@ export function ApiResponseComponent() {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete the entry?")) {
       try {
-        const baseUrl = config.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+        const baseUrl = config.REACT_APP_CAMPAIGN_CONTROLLER_API_REST_URL;
         const url = `${baseUrl}/v1/api/plannerbooks/${id}`;
         
         const response = await fetch(url, { method: "DELETE" });
@@ -87,18 +87,17 @@ export function ApiResponseComponent() {
               <th>Campaign</th>
               <th>Action</th>
               <th>Execution Time</th>
-              <th>Delete</th>
             </tr>
           </thead>
           <tbody>
             {data.map((item) => (
               <tr key={item.id}>
-                <td>{item.campaign}</td>
+                <td className="campaign-cell" onClick={() => handleDelete(item.id)}>
+                  {item.campaign}
+                  <span className="delete-icon">🗑️</span>
+                </td>
                 <td>{item.action === 1 ? "Enable" : "Disable"}</td>
                 <td>{formatDate(item.executionDate)}</td>
-                <td>
-                  <button onClick={() => handleDelete(item.id)}>Delete</button>
-                </td>
               </tr>
             ))}
           </tbody>

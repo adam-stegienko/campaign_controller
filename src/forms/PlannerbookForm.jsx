@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import "./PlannerbookForm.css";
+import "../styles/PlannerbookForm.css";
 import Configuration from "../services/Configuration.jsx";
 
 export function PlannerbookForm({ onSubmit }) {
@@ -52,7 +52,7 @@ export function PlannerbookForm({ onSubmit }) {
     }
 
     try {
-      const baseUrl = config.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+      const baseUrl = config.REACT_APP_CAMPAIGN_CONTROLLER_API_REST_URL;
       const url = `${baseUrl}/v1/api/plannerbooks`;
 
       const response = await fetch(url, {

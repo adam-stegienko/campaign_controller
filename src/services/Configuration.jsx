@@ -32,4 +32,5 @@ class Configuration {
   }
 }
 
-export default new Configuration();
+const configurationInstance = new Configuration();
+export default configurationInstance;

@@ -13,7 +13,7 @@ export function GoogleResponseComponent() {
         // Load configuration first
         const cfg = await Configuration.loadConfig();
 
-        const baseUrl = cfg.REACT_APP_CAMPAIGN_CONTROLLER_API_URL;
+        const baseUrl = cfg.REACT_APP_GOOGLE_ADS_API_URL;
         const customerId = cfg.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
         const campaignNames = cfg.REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES;
         const url = `${baseUrl}/v1/api/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
