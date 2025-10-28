@@ -28,8 +28,8 @@ RUN npm run build
 # Stage 2: Serve the React application using a lightweight web server
 FROM nginx:1.27-alpine
 
-# Remove default nginx website
-RUN rm -rf /usr/share/nginx/html/*
+# Remove default nginx website and configs
+RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/*
 
 # Copy the build output from the previous stage
 COPY --from=build /app/build /usr/share/nginx/html
@@ -49,7 +49,7 @@ RUN mkdir -p /var/cache/nginx/client_temp \
                               /var/run \
                               /var/log/nginx \
                               /usr/share/nginx/html \
-                              /etc/nginx/conf.d
+                              /etc/nginx
 
 # Create nginx.conf that works with non-root user
 RUN echo 'pid /var/run/nginx.pid; \
@@ -62,6 +62,8 @@ http { \
     default_type application/octet-stream; \
     sendfile on; \
     keepalive_timeout 65; \
+    gzip on; \
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript; \
     server { \
         listen 8000; \
         server_name localhost; \
@@ -69,6 +71,11 @@ http { \
         index index.html; \
         location / { \
             try_files $uri $uri/ /index.html; \
+        } \
+        location /config.json { \
+            add_header Cache-Control "no-cache, no-store, must-revalidate"; \
+            add_header Pragma "no-cache"; \
+            add_header Expires "0"; \
         } \
     } \
 }' > /etc/nginx/nginx.conf
@@ -79,5 +86,5 @@ EXPOSE 8000
 # Switch to the non-root user
 USER appuser
 
-# Start nginx
+# Start nginx directly (bypass docker entrypoint)
 CMD ["nginx", "-g", "daemon off;"]
