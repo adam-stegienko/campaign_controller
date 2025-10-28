@@ -1,8 +1,8 @@
 # Stage 1: Build the React application
 FROM node:24.10-trixie AS build
 
-# Create a non-root user and group
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
+# Create a non-root user and group with home directory set to /app
+RUN groupadd --system appgroup && useradd --system --gid appgroup --home-dir /app --no-create-home appuser
 
 # Set working directory
 WORKDIR /app
@@ -34,8 +34,8 @@ RUN rm -rf /usr/share/nginx/html/* /etc/nginx/*
 # Copy the build output from the previous stage
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Create a non-root user and group
-RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
+# Create a non-root user and group with home directory set to /usr/share/nginx/html
+RUN groupadd --system appgroup && useradd --system --gid appgroup --home-dir /usr/share/nginx/html --no-create-home appuser
 
 # Create nginx cache directories and set permissions
 RUN mkdir -p /var/cache/nginx/client_temp \
@@ -43,11 +43,11 @@ RUN mkdir -p /var/cache/nginx/client_temp \
              /var/cache/nginx/fastcgi_temp \
              /var/cache/nginx/uwsgi_temp \
              /var/cache/nginx/scgi_temp \
-             /var/run \
+             /tmp/nginx \
              /var/log/nginx \
              /etc/nginx && \
     chown -R appuser:appgroup /var/cache/nginx \
-                              /var/run \
+                              /tmp/nginx \
                               /var/log/nginx \
                               /usr/share/nginx/html \
                               /etc/nginx
@@ -68,7 +68,7 @@ RUN echo 'types { \
 }' > /etc/nginx/mime.types
 
 # Create nginx.conf that works with non-root user
-RUN echo 'pid /var/run/nginx.pid; \
+RUN echo 'pid /tmp/nginx/nginx.pid; \
 error_log /var/log/nginx/error.log warn; \
 events { \
     worker_connections 1024; \
