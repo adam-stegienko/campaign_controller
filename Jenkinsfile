@@ -30,7 +30,7 @@ def DUPLICATED_TAG = 'false'
 pipeline {
     agent any
     environment {
-        APP_NAME = 'campaign_controller'
+        APP_NAME = 'campaign-controller-ui'
         SONAR_SERVER = 'LabSonarQube'
         SONAR_PROJECT_NAME = 'campaign_controller'
         SONAR_PROJECT_KEY = 'campaign_controller'
