@@ -35,11 +35,43 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY --from=build /app/build /usr/share/nginx/html
 
 # Create a non-root user and group
-# Change ownership of the web root directory
-# Change ownership of the nginx configuration directory
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    chown -R appuser:appgroup /usr/share/nginx/html && \
-    chown -R appuser:appgroup /etc/nginx
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Create nginx cache directories and set permissions
+RUN mkdir -p /var/cache/nginx/client_temp \
+             /var/cache/nginx/proxy_temp \
+             /var/cache/nginx/fastcgi_temp \
+             /var/cache/nginx/uwsgi_temp \
+             /var/cache/nginx/scgi_temp \
+             /var/run \
+             /var/log/nginx && \
+    chown -R appuser:appgroup /var/cache/nginx \
+                              /var/run \
+                              /var/log/nginx \
+                              /usr/share/nginx/html \
+                              /etc/nginx/conf.d
+
+# Create nginx.conf that works with non-root user
+RUN echo 'pid /var/run/nginx.pid; \
+error_log /var/log/nginx/error.log warn; \
+events { \
+    worker_connections 1024; \
+} \
+http { \
+    include /etc/nginx/mime.types; \
+    default_type application/octet-stream; \
+    sendfile on; \
+    keepalive_timeout 65; \
+    server { \
+        listen 8000; \
+        server_name localhost; \
+        root /usr/share/nginx/html; \
+        index index.html; \
+        location / { \
+            try_files $uri $uri/ /index.html; \
+        } \
+    } \
+}' > /etc/nginx/nginx.conf
 
 # Expose port 8000
 EXPOSE 8000
