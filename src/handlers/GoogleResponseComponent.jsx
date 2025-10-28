@@ -10,13 +10,20 @@ export function GoogleResponseComponent() {
   useEffect(() => {
     const fetchCampaigns = async () => {
       try {
-        // Load configuration first
-        const cfg = await Configuration.loadConfig();
+        // Load configuration using the centralized service
+        await Configuration.loadConfig();
 
-        const baseUrl = cfg.REACT_APP_GOOGLE_ADS_API_URL;
-        const customerId = cfg.REACT_APP_GOOGLE_ADS_CUSTOMER_ID;
-        const campaignNames = cfg.REACT_APP_GOOGLE_ADS_CAMPAIGN_NAMES;
-        const url = `${baseUrl}/v1/api/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
+        // Use convenience methods from Configuration service
+        const googleAdsApiUrl = Configuration.get('googleAds.apiUrl');
+        const customerId = Configuration.get('googleAds.customerId');
+        const campaignNames = Configuration.get('googleAds.campaignNames');
+
+        // Validate required configuration
+        if (!googleAdsApiUrl || !customerId || !campaignNames) {
+          throw new Error('Missing required Google Ads configuration');
+        }
+
+        const url = `${googleAdsApiUrl}/v1/api/google-ads/campaigns/status?customerId=${customerId}&campaignNames=${campaignNames}`;
 
         const response = await fetch(url);
         if (!response.ok) {

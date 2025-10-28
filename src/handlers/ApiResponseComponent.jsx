@@ -6,17 +6,18 @@ export function ApiResponseComponent() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [config, setConfig] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Load configuration first
-        const cfg = await Configuration.loadConfig();
-        setConfig(cfg);
+        await Configuration.loadConfig();
+        
+        const apiUrl = Configuration.get('apiUrl');
+        if (!apiUrl) {
+          throw new Error('API URL not configured');
+        }
 
-        const baseUrl = cfg.REACT_APP_CAMPAIGN_CONTROLLER_API_REST_URL;
-        const url = `${baseUrl}/v1/api/plannerbooks`;
+        const url = `${apiUrl}/v1/api/plannerbooks`;
         
         const response = await fetch(url);
         if (!response.ok) {
@@ -36,6 +37,29 @@ export function ApiResponseComponent() {
     fetchData();
   }, []);
 
+  const handleDelete = async (id) => {
+    if (!Configuration.isConfigLoaded()) {
+      console.error("Configuration not loaded");
+      return;
+    }
+
+    if (window.confirm("Are you sure you want to delete the entry?")) {
+      try {
+        const apiUrl = Configuration.get('apiUrl');
+        const url = `${apiUrl}/v1/api/plannerbooks/${id}`;
+
+        const response = await fetch(url, { method: "DELETE" });
+        if (!response.ok) {
+          throw new Error(`API call failed with status: ${response.status}`);
+        }
+        
+        setData(data.filter((item) => item.id !== id));
+      } catch (error) {
+        console.error("Error deleting data:", error);
+      }
+    }
+  };
+
   // Helper function to format the execution date
   const formatDate = (dateString) => {
     const options = {
@@ -48,26 +72,6 @@ export function ApiResponseComponent() {
       hour12: false,
     };
     return new Date(dateString).toLocaleDateString(undefined, options);
-  };
-
-  // Function to handle delete action
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete the entry?")) {
-      try {
-        const baseUrl = config.REACT_APP_CAMPAIGN_CONTROLLER_API_REST_URL;
-        const url = `${baseUrl}/v1/api/plannerbooks/${id}`;
-        
-        const response = await fetch(url, { method: "DELETE" });
-        if (!response.ok) {
-          throw new Error(`API call failed with status: ${response.status}`);
-        }
-        
-        // Update state to remove the deleted item
-        setData(data.filter((item) => item.id !== id));
-      } catch (error) {
-        console.error("Error deleting data:", error);
-      }
-    }
   };
 
   if (loading) {

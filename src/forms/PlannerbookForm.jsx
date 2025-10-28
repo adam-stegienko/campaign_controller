@@ -4,15 +4,21 @@ import Configuration from "../services/Configuration.jsx";
 
 export function PlannerbookForm({ onSubmit }) {
   const [executionDateValid, setExecutionDateValid] = useState(true);
-  const [config, setConfig] = useState(null);
   const [isFormVisible, setFormVisible] = useState(false);
+  const [campaignOptions, setCampaignOptions] = useState([]);
   const formRef = useRef(null);
 
   useEffect(() => {
     const loadConfiguration = async () => {
       try {
-        const cfg = await Configuration.loadConfig();
-        setConfig(cfg);
+        await Configuration.loadConfig();
+        
+        // Get campaign names from configuration and create options
+        const campaignNames = Configuration.get('googleAds.campaignNames');
+        if (campaignNames) {
+          const options = campaignNames.split(',').map(name => name.trim());
+          setCampaignOptions(options);
+        }
       } catch (error) {
         console.error("Error loading configuration:", error);
       }
@@ -32,7 +38,7 @@ export function PlannerbookForm({ onSubmit }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     
-    if (!config) {
+    if (!Configuration.isConfigLoaded()) {
       console.error("Configuration not loaded");
       return;
     }
@@ -52,8 +58,8 @@ export function PlannerbookForm({ onSubmit }) {
     }
 
     try {
-      const baseUrl = config.REACT_APP_CAMPAIGN_CONTROLLER_API_REST_URL;
-      const url = `${baseUrl}/v1/api/plannerbooks`;
+      const apiUrl = Configuration.get('apiUrl');
+      const url = `${apiUrl}/v1/api/plannerbooks`;
 
       const response = await fetch(url, {
         method: "POST",
@@ -102,9 +108,11 @@ export function PlannerbookForm({ onSubmit }) {
               <option value="" disabled>
                 --Select Campaign--
               </option>
-              <option value="Przeprowadzki">Przeprowadzki</option>
-              <option value="Transport">Transport</option>
-              <option value="Magazynowanie">Magazynowanie</option>
+              {campaignOptions.map((campaign) => (
+                <option key={campaign} value={campaign}>
+                  {campaign}
+                </option>
+              ))}
             </select>
             <select className="form-select" name="action" required>
               <option value="" disabled>
