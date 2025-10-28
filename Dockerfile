@@ -29,7 +29,7 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 # Remove default nginx website and configs
-RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/*
+RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/* /docker-entrypoint.d/*
 
 # Copy the build output from the previous stage
 COPY --from=build /app/build /usr/share/nginx/html
@@ -86,5 +86,8 @@ EXPOSE 8000
 # Switch to the non-root user
 USER appuser
 
-# Start nginx directly (bypass docker entrypoint)
+# Override the entrypoint to bypass docker-entrypoint.sh
+ENTRYPOINT []
+
+# Start nginx directly
 CMD ["nginx", "-g", "daemon off;"]
