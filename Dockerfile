@@ -29,7 +29,7 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 # Remove default nginx website and configs
-RUN rm -rf /usr/share/nginx/html/* /etc/nginx/conf.d/* /docker-entrypoint.d/*
+RUN rm -rf /usr/share/nginx/html/* /etc/nginx/*
 
 # Copy the build output from the previous stage
 COPY --from=build /app/build /usr/share/nginx/html
@@ -44,12 +44,28 @@ RUN mkdir -p /var/cache/nginx/client_temp \
              /var/cache/nginx/uwsgi_temp \
              /var/cache/nginx/scgi_temp \
              /var/run \
-             /var/log/nginx && \
+             /var/log/nginx \
+             /etc/nginx && \
     chown -R appuser:appgroup /var/cache/nginx \
                               /var/run \
                               /var/log/nginx \
                               /usr/share/nginx/html \
                               /etc/nginx
+
+# Create a minimal mime.types file
+RUN echo 'types { \
+    text/html html htm shtml; \
+    text/css css; \
+    application/javascript js; \
+    application/json json; \
+    image/png png; \
+    image/jpeg jpg jpeg; \
+    image/gif gif; \
+    image/svg+xml svg; \
+    image/x-icon ico; \
+    font/woff woff; \
+    font/woff2 woff2; \
+}' > /etc/nginx/mime.types
 
 # Create nginx.conf that works with non-root user
 RUN echo 'pid /var/run/nginx.pid; \
