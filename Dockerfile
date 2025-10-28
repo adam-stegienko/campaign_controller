@@ -1,5 +1,5 @@
 # Stage 1: Build the React application
-FROM node:22-alpine AS build
+FROM node:24.10-trixie AS build
 
 # Create a non-root user and group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -26,7 +26,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve the React application using a lightweight web server
-FROM nginx:1.27-alpine
+FROM nginx:1.29-trixie-otel
 
 # Remove default nginx website and configs
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/*
