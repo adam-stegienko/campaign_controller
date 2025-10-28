@@ -2,7 +2,7 @@
 FROM node:24.10-trixie AS build
 
 # Create a non-root user and group
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 
 # Set working directory
 WORKDIR /app
@@ -35,7 +35,7 @@ RUN rm -rf /usr/share/nginx/html/* /etc/nginx/*
 COPY --from=build /app/build /usr/share/nginx/html
 
 # Create a non-root user and group
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN groupadd --system appgroup && useradd --system --gid appgroup appuser
 
 # Create nginx cache directories and set permissions
 RUN mkdir -p /var/cache/nginx/client_temp \
