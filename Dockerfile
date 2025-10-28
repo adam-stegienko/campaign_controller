@@ -2,22 +2,22 @@
 FROM node:22-alpine AS build
 
 # Create a non-root user and group
-# Change ownership of the working directory
-RUN \
-    addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    chown appuser:appgroup /app
-
-# Switch to the non-root user
-USER appuser
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Set working directory
 WORKDIR /app
 
+# Change ownership of the working directory
+RUN chown appuser:appgroup /app
+
+# Switch to the non-root user
+USER appuser
+
 # Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --omit=dev
+# Install dependencies including devDependencies for build
+RUN npm ci
 
 # Copy the rest of the application code
 COPY . .
