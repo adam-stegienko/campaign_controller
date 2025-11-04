@@ -209,7 +209,7 @@ pipeline {
             }
             steps {
                 script {
-                    def scannerHome = tool 'JenkinsSonarScanner'
+                    scannerHome = tool 'JenkinsSonarScanner'
                 }
                 withSonarQubeEnv(env.SONAR_SERVER) {
                     sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.projectVersion=${env.APP_VERSION}"
