@@ -96,8 +96,23 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 script {
+                    // Clean state
                     sh 'rm -rf node_modules'
-                    sh 'npm ci'
+                    
+                    // Check if package-lock.json is in sync, if not regenerate it
+                    def lockFileExists = fileExists('package-lock.json')
+                    if (lockFileExists) {
+                        // Try npm ci first, if it fails, regenerate lock file
+                        def ciResult = sh(script: 'npm ci', returnStatus: true)
+                        if (ciResult != 0) {
+                            echo 'package-lock.json out of sync, regenerating...'
+                            sh 'rm -f package-lock.json'
+                            sh 'npm install'
+                        }
+                    } else {
+                        echo 'No package-lock.json found, generating...'
+                        sh 'npm install'
+                    }
                 }
             }
         }
