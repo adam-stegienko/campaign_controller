@@ -4,19 +4,27 @@ def calculateVersion(latestTag) {
     // Fetch the latest commit message
     def commitMessage = sh(returnStdout: true, script: 'git log -1 --pretty=%B').trim()
 
-    // Increment the version based on the commit message
-    if (commitMessage.contains('major')) {
-        major = major.toInteger() + 1
-        minor = '0'
-        patch = '0'
-    } else if (commitMessage.contains('minor')) {
-        minor = minor.toInteger() + 1
-        patch = '0'
+    // Increment the version based on conventional commit standards
+    if (commitMessage.toLowerCase().contains('breaking change') || 
+        commitMessage.toLowerCase().contains('major:') ||
+        commitMessage.toLowerCase().startsWith('feat!') ||
+        commitMessage.toLowerCase().startsWith('fix!')) {
+        return 'major'
+    } else if (commitMessage.toLowerCase().startsWith('feat') || 
+               commitMessage.toLowerCase().contains('minor:')) {
+        return 'minor'
+    } else if (commitMessage.toLowerCase().startsWith('fix') ||
+               commitMessage.toLowerCase().startsWith('docs') ||
+               commitMessage.toLowerCase().startsWith('style') ||
+               commitMessage.toLowerCase().startsWith('refactor') ||
+               commitMessage.toLowerCase().startsWith('perf') ||
+               commitMessage.toLowerCase().startsWith('test') ||
+               commitMessage.toLowerCase().startsWith('chore') ||
+               commitMessage.toLowerCase().contains('patch:')) {
+        return 'patch'
     } else {
-        patch = patch.toInteger() + 1
+        return 'patch'  // Default to patch increment
     }
-
-    return "${major}.${minor}.${patch}"
 }
 
 def cleanGit() {
@@ -85,44 +93,101 @@ pipeline {
             }
         }
 
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm ci'
+            }
+        }
+
         stage('Calculate Version') {
             steps {
                 script {
-                    def latestTag = '0.0.0'
+                    // Get current version from package.json
+                    def currentPackageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
+                    
+                    // Get latest git tag
+                    def latestTag = currentPackageVersion
                     try {
                         latestTag = sh(returnStdout: true, script: 'git tag | sort -Vr | head -n 1').trim()
-                    } catch (Exception e) {}
-                    env.APP_VERSION = calculateVersion(latestTag)
+                        if (!latestTag) {
+                            latestTag = currentPackageVersion
+                        }
+                    } catch (Exception e) {
+                        latestTag = currentPackageVersion
+                    }
+                    
+                    def versionType = calculateVersion(latestTag)
 
                     // Check if the latest commit already has a tag
                     def latestCommitTag = ''
                     try {
                         latestCommitTag = sh(returnStdout: true, script: 'git tag --contains HEAD').trim()
                     } catch (Exception e) {}
+                    
                     if (latestCommitTag) {
                         DUPLICATED_TAG = 'true'
+                        env.APP_VERSION = currentPackageVersion
                         sh "echo 'Tag ${latestCommitTag} already exists for the latest commit. DUPLICATED_TAG env var is set to: '${DUPLICATED_TAG}"
                     } else {
-                        sh "echo ${latestTag} '->' ${env.APP_VERSION}"
-                        sh "echo DUPLICATED_TAG: ${DUPLICATED_TAG}"
+                        sh "echo 'Current package.json version: ${currentPackageVersion}'"
+                        sh "echo 'Latest git tag: ${latestTag}'"
+                        sh "echo 'Version increment type: ${versionType}'"
+                        sh "echo 'DUPLICATED_TAG: ${DUPLICATED_TAG}'"
+                        
+                        // Use npm version to increment and get the new version
+                        env.APP_VERSION = sh(returnStdout: true, script: "npm version ${versionType} --no-git-tag-version").trim()
+                        sh "echo 'New version: ${env.APP_VERSION}'"
                     }
                 }
             }
         }
 
-        // stage('Provide Config File') {
-        //     steps {
-        //         configFileProvider([configFile(fileId: '35c99061-027f-457b-87e9-e5950705128a', targetLocation: 'src/main/resources/application.properties')]) {}
-        //     }
-        // }
+        stage('Build React App') {
+            when {
+                expression {
+                    return currentBuild.currentResult == 'SUCCESS'
+                }
+            }
+            steps {
+                sh 'npm run build'
+            }
+        }
+
+        stage('Run Tests') {
+            when {
+                expression {
+                    return currentBuild.currentResult == 'SUCCESS'
+                }
+            }
+            steps {
+                sh 'CI=true npm test -- --coverage --watchAll=false'
+            }
+            post {
+                always {
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'coverage/lcov-report',
+                        reportFiles: 'index.html',
+                        reportName: 'Coverage Report'
+                    ])
+                }
+            }
+        }
 
         stage('SonarQube analysis') {
+            when {
+                expression {
+                    return currentBuild.currentResult == 'SUCCESS'
+                }
+            }
             steps {
                 script {
                     scannerHome = tool 'JenkinsSonarScanner'
                 }
-                withSonarQubeEnv(env.SONAR_SERVER) {// If you have configured more than one global server connection, you can specify its name as configured in Jenkins
-                sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}'"
+                withSonarQubeEnv(env.SONAR_SERVER) {
+                    sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.projectVersion=${env.APP_VERSION}"
                 }
             }
         }
@@ -175,10 +240,16 @@ pipeline {
             steps {
                 script {
                     sshagent(['jenkins_github_np']) {
-                        cleanGit()
                         sh "git config --global user.email 'adam.stegienko1@gmail.com'"
                         sh "git config --global user.name 'Adam Stegienko'"
+                        
+                        // Add the updated package.json and package-lock.json
+                        sh "git add package.json package-lock.json"
+                        sh "git commit -m 'chore: bump version to ${env.APP_VERSION} [skip ci]'"
+                        
+                        // Create and push tag (x.y.z format, no 'v' prefix)
                         sh "git tag ${env.APP_VERSION}"
+                        sh "git push origin master"
                         sh "git push origin tag ${env.APP_VERSION}"
                     }
                 }
