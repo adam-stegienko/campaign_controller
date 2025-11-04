@@ -183,7 +183,7 @@ pipeline {
                     def testResult = sh(script: 'CI=true npm test -- --coverage --watchAll=false --passWithNoTests', returnStatus: true)
                     if (testResult != 0) {
                         echo "Tests failed, but continuing build..."
-                        currentBuild.result = 'SUCCESS'
+                        currentBuild.result = 'UNSTABLE'
                     }
                 }
             }
@@ -204,12 +204,12 @@ pipeline {
         stage('SonarQube analysis') {
             when {
                 expression {
-                    return currentBuild.currentResult == 'SUCCESS'
+                    return currentBuild.currentResult != 'FAILED'
                 }
             }
             steps {
                 script {
-                    scannerHome = tool 'JenkinsSonarScanner'
+                    def scannerHome = tool 'JenkinsSonarScanner'
                 }
                 withSonarQubeEnv(env.SONAR_SERVER) {
                     sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.projectVersion=${env.APP_VERSION}"
