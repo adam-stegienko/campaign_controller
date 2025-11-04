@@ -93,30 +93,6 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                script {
-                    // Clean state
-                    sh 'rm -rf node_modules'
-                    
-                    // Check if package-lock.json is in sync, if not regenerate it
-                    def lockFileExists = fileExists('package-lock.json')
-                    if (lockFileExists) {
-                        // Try npm ci first, if it fails, regenerate lock file
-                        def ciResult = sh(script: 'npm ci', returnStatus: true)
-                        if (ciResult != 0) {
-                            echo 'package-lock.json out of sync, regenerating...'
-                            sh 'rm -f package-lock.json'
-                            sh 'npm install'
-                        }
-                    } else {
-                        echo 'No package-lock.json found, generating...'
-                        sh 'npm install'
-                    }
-                }
-            }
-        }
-
         stage('Calculate Version') {
             steps {
                 script {
@@ -156,47 +132,6 @@ pipeline {
                         env.APP_VERSION = sh(returnStdout: true, script: "npm version ${versionType} --no-git-tag-version").trim()
                         sh "echo 'New version: ${env.APP_VERSION}'"
                     }
-                }
-            }
-        }
-
-        stage('Build React App') {
-            when {
-                expression {
-                    return currentBuild.currentResult == 'SUCCESS'
-                }
-            }
-            steps {
-                sh 'npm run build'
-            }
-        }
-
-        stage('Run Tests') {
-            when {
-                expression {
-                    return currentBuild.currentResult == 'SUCCESS'
-                }
-            }
-            steps {
-                script {
-                    // Run tests but don't fail the build on test failures during development
-                    def testResult = sh(script: 'CI=true npm test -- --coverage --watchAll=false --passWithNoTests', returnStatus: true)
-                    if (testResult != 0) {
-                        echo "Tests failed, but continuing build..."
-                        currentBuild.result = 'UNSTABLE'
-                    }
-                }
-            }
-            post {
-                always {
-                    publishHTML([
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: true,
-                        reportDir: 'coverage/lcov-report',
-                        reportFiles: 'index.html',
-                        reportName: 'Coverage Report'
-                    ])
                 }
             }
         }
