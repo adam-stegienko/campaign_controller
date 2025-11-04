@@ -139,7 +139,7 @@ pipeline {
         stage('SonarQube analysis') {
             when {
                 expression {
-                    return currentBuild.currentResult != 'FAILED'
+                    return currentBuild.currentResult == 'SUCCESS'
                 }
             }
             steps {
