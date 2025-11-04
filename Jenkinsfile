@@ -95,7 +95,10 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm ci'
+                script {
+                    sh 'rm -rf node_modules'
+                    sh 'npm ci'
+                }
             }
         }
 
