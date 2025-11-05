@@ -31,8 +31,8 @@ FROM nginx:1.29-trixie-otel
 # Remove default nginx website and configs
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/*
 
-# Copy the build output from the previous stage
-COPY --from=build /app/build /usr/share/nginx/html
+# # Copy the build output from the previous stage
+# COPY --from=build /app/build /usr/share/nginx/html
 
 # Create a non-root user and group with home directory set to /usr/share/nginx/html
 RUN groupadd --system appgroup && useradd --system --gid appgroup --home-dir /usr/share/nginx/html --no-create-home appuser
