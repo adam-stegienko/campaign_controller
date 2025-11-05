@@ -82,7 +82,8 @@ pipeline {
                     branches: [[name: '*/master']],
                     doGenerateSubmoduleConfigurations: 'false',
                     extensions: [
-                        [$class: 'CloneOption', noTags: false, shallow: false]
+                        [$class: 'CloneOption', noTags: false, shallow: false],
+                        [$class: 'LocalBranch', localBranch: 'master']
                     ],
                     submoduleCfg: [],
                     userRemoteConfigs: [[
@@ -202,6 +203,9 @@ pipeline {
                     sshagent(['jenkins_github_np']) {
                         sh "git config --global user.email 'adam.stegienko1@gmail.com'"
                         sh "git config --global user.name 'Adam Stegienko'"
+                        
+                        // Ensure we're on the master branch
+                        sh "git checkout master"
                         
                         // Add the updated package.json and package-lock.json
                         sh "git add package.json package-lock.json"
