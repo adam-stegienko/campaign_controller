@@ -101,13 +101,11 @@ http { \
 # Expose port 8000
 EXPOSE 8000
 
-# Create a custom entrypoint script that runs nginx directly
-RUN echo '#!/bin/sh\nexec nginx -g "daemon off;"' > /usr/local/bin/start-nginx.sh && \
-    chmod +x /usr/local/bin/start-nginx.sh && \
-    chown appuser:appgroup /usr/local/bin/start-nginx.sh
-
 # Switch to the non-root user
 USER appuser
 
-# Use our custom entrypoint
-ENTRYPOINT ["/usr/local/bin/start-nginx.sh"]
+# Override the entrypoint to bypass docker-entrypoint.sh
+ENTRYPOINT []
+
+# Start nginx directly
+CMD ["nginx", "-g", "daemon off;"]
