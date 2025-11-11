@@ -31,11 +31,11 @@ FROM nginx:1.29-trixie-otel
 # Remove default nginx website and configs
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/*
 
-# Copy the build output from the previous stage
-COPY --from=build /app/build /usr/share/nginx/html
-
 # Create a non-root user and group with home directory set to /usr/share/nginx/html
 RUN groupadd --system appgroup && useradd --system --gid appgroup --home-dir /usr/share/nginx/html --no-create-home appuser
+
+# Copy the build output from the previous stage
+COPY --from=build /app/build /usr/share/nginx/html
 
 # Create nginx cache directories and set permissions
 RUN mkdir -p /var/cache/nginx/client_temp \
@@ -45,12 +45,14 @@ RUN mkdir -p /var/cache/nginx/client_temp \
              /var/cache/nginx/scgi_temp \
              /tmp/nginx \
              /var/log/nginx \
-             /etc/nginx && \
+             /etc/nginx \
+             /run/nginx && \
     chown -R appuser:appgroup /var/cache/nginx \
                               /tmp/nginx \
                               /var/log/nginx \
                               /usr/share/nginx/html \
-                              /etc/nginx
+                              /etc/nginx \
+                              /run/nginx
 
 # Create a minimal mime.types file
 RUN echo 'types { \
@@ -99,11 +101,13 @@ http { \
 # Expose port 8000
 EXPOSE 8000
 
+# Create a custom entrypoint script that runs nginx directly
+RUN echo '#!/bin/sh\nexec nginx -g "daemon off;"' > /usr/local/bin/start-nginx.sh && \
+    chmod +x /usr/local/bin/start-nginx.sh && \
+    chown appuser:appgroup /usr/local/bin/start-nginx.sh
+
 # Switch to the non-root user
 USER appuser
 
-# Override the entrypoint to bypass docker-entrypoint.sh
-ENTRYPOINT []
-
-# Start nginx directly
-CMD ["nginx", "-g", "daemon off;"]
+# Use our custom entrypoint
+ENTRYPOINT ["/usr/local/bin/start-nginx.sh"]
