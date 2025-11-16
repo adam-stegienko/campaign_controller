@@ -79,11 +79,10 @@ pipeline {
             steps {
                 checkout([
                     $class: 'GitSCM',
-                    branches: [[name: '*/master']],
+                    branches: [[name: '*/master'], [name: '*/release/*']],
                     doGenerateSubmoduleConfigurations: 'false',
                     extensions: [
-                        [$class: 'CloneOption', noTags: false, shallow: false],
-                        [$class: 'LocalBranch', localBranch: 'master']
+                        [$class: 'CloneOption', noTags: false, shallow: false]
                     ],
                     submoduleCfg: [],
                     userRemoteConfigs: [[
@@ -204,16 +203,18 @@ pipeline {
                         sh "git config --global user.email 'adam.stegienko1@gmail.com'"
                         sh "git config --global user.name 'Adam Stegienko'"
                         
-                        // Ensure we're on the master branch
-                        sh "git checkout master"
+                        // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to master
+                        def targetBranch = env.BRANCH_NAME ?: 'master'
+                        sh "echo 'Target branch for version update: ${targetBranch}'"
+                        sh "git checkout ${targetBranch}"
                         
                         // Add the updated package.json and package-lock.json
                         sh "git add package.json package-lock.json"
-                        sh "git commit -m 'chore: bump version to ${env.APP_VERSION} [skip ci]'"
+                        sh "git commit -m 'new version: ${env.APP_VERSION} [skip ci]'"
                         
                         // Create and push tag (x.y.z format, no 'v' prefix)
                         sh "git tag ${env.APP_VERSION}"
-                        sh "git push origin master"
+                        sh "git push origin ${targetBranch}"
                         sh "git push origin tag ${env.APP_VERSION}"
                     }
                 }
