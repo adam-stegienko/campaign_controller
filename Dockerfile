@@ -31,6 +31,10 @@ FROM nginx:1.29-trixie-otel
 # Remove default nginx website and configs
 RUN rm -rf /usr/share/nginx/html/* /etc/nginx/*
 
+# Install wget for HEALTHCHECK (done as root before switching users)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget ca-certificates && rm -rf /var/lib/apt/lists/*
+
 # Create a non-root user and group with home directory set to /usr/share/nginx/html
 RUN groupadd --system appgroup && useradd --system --gid appgroup --home-dir /usr/share/nginx/html --no-create-home appuser
 
@@ -109,3 +113,7 @@ ENTRYPOINT []
 
 # Start nginx directly
 CMD ["nginx", "-g", "daemon off;"]
+
+# Docker healthcheck: probe the local nginx HTTP endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["sh", "-c", "wget -q --spider http://localhost:8000/health || exit 1"]
