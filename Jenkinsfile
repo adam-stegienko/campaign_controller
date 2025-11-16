@@ -79,7 +79,7 @@ pipeline {
             steps {
                 checkout([
                     $class: 'GitSCM',
-                    branches: [[name: '*/master'], [name: '*/release/*']],
+                    branches: [[name: '*/master'], [name: 'release/*']],
                     doGenerateSubmoduleConfigurations: 'false',
                     extensions: [
                         [$class: 'CloneOption', noTags: false, shallow: false]
