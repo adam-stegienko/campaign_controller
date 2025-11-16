@@ -206,11 +206,14 @@ pipeline {
                         // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to master
                         def targetBranch = env.BRANCH_NAME ?: 'master'
                         sh "echo 'Target branch for version update: ${targetBranch}'"
-                        sh '''
+                        sh """
                         # checkout target branch and make sure it's up-to-date
                         git checkout ${targetBranch}
                         git fetch origin ${targetBranch}
+                        # stash local changes so rebase/pull can run
+                        git stash push -u -m "jenkins-autostash" || true
                         git pull --rebase origin ${targetBranch} || true
+                        git stash pop || true
 
                         # Add updated package files only if changed by npm version
                         git add package.json package-lock.json || true
@@ -237,7 +240,7 @@ pipeline {
 
                         # Push tag (may fail if tag already exists remotely)
                         git push origin tag ${env.APP_VERSION} || echo 'Push tag failed (may already exist)'
-                        '''
+                        """
                     }
                 }
             }
