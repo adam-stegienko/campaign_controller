@@ -206,16 +206,38 @@ pipeline {
                         // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to master
                         def targetBranch = env.BRANCH_NAME ?: 'master'
                         sh "echo 'Target branch for version update: ${targetBranch}'"
-                        sh "git checkout ${targetBranch}"
-                        
-                        // Add the updated package.json and package-lock.json
-                        sh "git add package.json package-lock.json"
-                        sh "git commit -m 'new version: ${env.APP_VERSION} [skip ci]'"
-                        
-                        // Create and push tag (x.y.z format, no 'v' prefix)
-                        sh "git tag ${env.APP_VERSION}"
-                        sh "git push origin ${targetBranch}"
-                        sh "git push origin tag ${env.APP_VERSION}"
+                        sh '''
+                        # checkout target branch and make sure it's up-to-date
+                        git checkout ${targetBranch}
+                        git fetch origin ${targetBranch}
+                        git pull --rebase origin ${targetBranch} || true
+
+                        # Add updated package files only if changed by npm version
+                        git add package.json package-lock.json || true
+
+                        # Commit only if there are staged changes
+                        if git diff --cached --quiet; then
+                            echo 'No changes to commit'
+                        else
+                            git commit -m "new version: ${env.APP_VERSION} [skip ci]"
+                        fi
+
+                        # Create tag (idempotent if tag already exists will fail)
+                        git tag ${env.APP_VERSION} || echo 'Tag already exists or failed to create tag'
+
+                        # Try push; if rejected, retry after pulling remote changes
+                        if git push origin ${targetBranch}; then
+                            echo 'Pushed branch successfully'
+                        else
+                            echo 'Push failed; attempting rebase with remote and retry'
+                            git fetch origin ${targetBranch}
+                            git rebase origin/${targetBranch} || { echo 'Rebase failed'; exit 1; }
+                            git push origin ${targetBranch}
+                        fi
+
+                        # Push tag (may fail if tag already exists remotely)
+                        git push origin tag ${env.APP_VERSION} || echo 'Push tag failed (may already exist)'
+                        '''
                     }
                 }
             }
