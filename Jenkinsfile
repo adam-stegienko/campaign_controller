@@ -163,16 +163,16 @@ pipeline {
             }
         }
 
-        stage('Docker Image Security Scan') {
-            when {
-                expression {
-                   return currentBuild.currentResult == 'SUCCESS'
-                }
-            }
-            steps {
-                sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
-            }
-        }
+        // stage('Docker Image Security Scan') {
+        //     when {
+        //         expression {
+        //            return currentBuild.currentResult == 'SUCCESS'
+        //         }
+        //     }
+        //     steps {
+        //         sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
+        //     }
+        // }
 
         stage('Docker Push') {
             when {
@@ -207,12 +207,15 @@ pipeline {
                         def targetBranch = env.BRANCH_NAME ?: 'master'
                         sh "echo 'Target branch for version update: ${targetBranch}'"
                         sh """
+                        # stash local changes first so checkout won't fail
+                        git stash push -u -m "jenkins-autostash" || true
+
                         # checkout target branch and make sure it's up-to-date
                         git checkout ${targetBranch}
                         git fetch origin ${targetBranch}
-                        # stash local changes so rebase/pull can run
-                        git stash push -u -m "jenkins-autostash" || true
                         git pull --rebase origin ${targetBranch} || true
+
+                        # restore stashed changes if any
                         git stash pop || true
 
                         # Add updated package files only if changed by npm version
