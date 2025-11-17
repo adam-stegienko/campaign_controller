@@ -77,19 +77,10 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/master'], [name: '*/release/*']],
-                    doGenerateSubmoduleConfigurations: 'false',
-                    extensions: [
-                        [$class: 'CloneOption', noTags: false, shallow: false]
-                    ],
-                    submoduleCfg: [],
-                    userRemoteConfigs: [[
-                        credentialsId: 'jenkins_github_np',
-                        url: 'git@github.com:adam-stegienko/campaign-controller-ui.git'
-                    ]]
-                ])
+                // Use the SCM configuration provided by the Jenkins job (multibranch or job-level branch specifier).
+                // This ensures Jenkins checks out the branch that triggered the job (BRANCH_NAME) or
+                // the branch configured in the multibranch pipeline job instead of forcing master.
+                checkout scm
             }
         }
 
@@ -203,17 +194,34 @@ pipeline {
                         sh "git config --global user.email 'adam.stegienko1@gmail.com'"
                         sh "git config --global user.name 'Adam Stegienko'"
                         
-                        // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to master
-                        def targetBranch = env.BRANCH_NAME ?: 'master'
-                        sh "echo 'Target branch for version update: ${targetBranch}'"
+                        // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to the actual checked-out git branch
+                        def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
+                        def targetBranch = env.BRANCH_NAME ?: (checkedOutBranch == 'HEAD' ? null : checkedOutBranch)
+                        sh "echo 'Detected checked-out branch: ${checkedOutBranch}'"
+                        sh "echo 'Target branch for version update: ${targetBranch ?: 'none (detached)'}'"
+
+                        // Only push/tag for protected branches: master, main, release/*
+                        def doPush = false
+                        if (targetBranch) {
+                            if (targetBranch == 'master' || targetBranch == 'main' || (targetBranch ==~ /release\/.*$/)) {
+                                doPush = true
+                            }
+                        }
+
+                        if (!doPush) {
+                            sh "echo 'Skipping push/tag: branch not eligible for remote push (detached or non-release branch)'; exit 0"
+                        }
+
+                        // Proceed with push/tag workflow for eligible branches
                         sh """
-                        # stash local changes first so checkout won't fail
+                        set -e
+                        # stash any local changes (safe because we only operate on eligible branches)
                         git stash push -u -m "jenkins-autostash" || true
 
                         # checkout target branch and make sure it's up-to-date
                         git checkout ${targetBranch}
                         git fetch origin ${targetBranch}
-                        git pull --rebase origin ${targetBranch} || true
+                        git pull --rebase origin ${targetBranch}
 
                         # restore stashed changes if any
                         git stash pop || true
@@ -231,17 +239,8 @@ pipeline {
                         # Create tag (idempotent if tag already exists will fail)
                         git tag ${env.APP_VERSION} || echo 'Tag already exists or failed to create tag'
 
-                        # Try push; if rejected, retry after pulling remote changes
-                        if git push origin ${targetBranch}; then
-                            echo 'Pushed branch successfully'
-                        else
-                            echo 'Push failed; attempting rebase with remote and retry'
-                            git fetch origin ${targetBranch}
-                            git rebase origin/${targetBranch} || { echo 'Rebase failed'; exit 1; }
-                            git push origin ${targetBranch}
-                        fi
-
-                        # Push tag (may fail if tag already exists remotely)
+                        # Push branch and tag
+                        git push origin ${targetBranch}
                         git push origin tag ${env.APP_VERSION} || echo 'Push tag failed (may already exist)'
                         """
                     }
