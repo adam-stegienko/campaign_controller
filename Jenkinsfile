@@ -37,6 +37,11 @@ def DUPLICATED_TAG = 'false'
 
 pipeline {
     agent any
+
+    triggers {
+        pollSCM('') // Enabling being build on Push
+    }
+    
     environment {
         APP_NAME = 'campaign-controller-ui'
         SONAR_SERVER = 'LabSonarQube'
