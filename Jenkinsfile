@@ -33,6 +33,13 @@ def cleanGit() {
     sh 'git clean -fdx'
 }
 
+def isEligibleBranch(branchName) {
+    if (!branchName) {
+        return false
+    }
+    return branchName == 'master' || branchName == 'main' || branchName ==~ /^release\/.*$/
+}
+
 def DUPLICATED_TAG = 'false'
 
 pipeline {
@@ -60,6 +67,13 @@ pipeline {
         stage('Start') {
             steps {
                 script {
+                    def targetBranch = env.BRANCH_NAME ?: sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
+                    sh "echo 'Building branch: ${targetBranch}'"
+                    
+                    if (!isEligibleBranch(targetBranch)) {
+                        sh "echo 'WARNING: Branch ${targetBranch} is not master, main, or release/*. Build will proceed but version tagging and push will be skipped.'"
+                    }
+                    
                     step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Pipeline started"]])
                     step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: "Build started", state: "PENDING"]]]])
                 }
@@ -70,16 +84,13 @@ pipeline {
             steps {
                 sshagent(['jenkins_github_np']) {
                     cleanGit()
-                    sh 'git tag -d $(git tag -l) > /dev/null 2>&1'
+                    sh 'git tag -d $(git tag -l) > /dev/null 2>&1 || true'
                 }
             }
         }
 
         stage('Checkout') {
             steps {
-                // Use the SCM configuration provided by the Jenkins job (multibranch or job-level branch specifier).
-                // This ensures Jenkins checks out the branch that triggered the job (BRANCH_NAME) or
-                // the branch configured in the multibranch pipeline job instead of forcing master.
                 checkout scm
             }
         }
@@ -87,6 +98,11 @@ pipeline {
         stage('Calculate Version') {
             steps {
                 script {
+                    // Determine the current branch
+                    def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
+                    def targetBranch = env.BRANCH_NAME ?: (checkedOutBranch == 'HEAD' ? null : checkedOutBranch)
+                    sh "echo 'Target branch: ${targetBranch ?: 'detached HEAD'}'"
+                    
                     // Get current version from package.json
                     def currentPackageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
                     
@@ -112,16 +128,21 @@ pipeline {
                     if (latestCommitTag) {
                         DUPLICATED_TAG = 'true'
                         env.APP_VERSION = currentPackageVersion
-                        sh "echo 'Tag ${latestCommitTag} already exists for the latest commit. DUPLICATED_TAG env var is set to: '${DUPLICATED_TAG}"
+                        sh "echo 'Tag ${latestCommitTag} already exists for the latest commit. DUPLICATED_TAG env var is set to: ${DUPLICATED_TAG}'"
                     } else {
                         sh "echo 'Current package.json version: ${currentPackageVersion}'"
                         sh "echo 'Latest git tag: ${latestTag}'"
                         sh "echo 'Version increment type: ${versionType}'"
                         sh "echo 'DUPLICATED_TAG: ${DUPLICATED_TAG}'"
                         
-                        // Use npm version to increment and get the new version
-                        env.APP_VERSION = sh(returnStdout: true, script: "npm version ${versionType} --no-git-tag-version").trim()
-                        sh "echo 'New version: ${env.APP_VERSION}'"
+                        // Only increment version for eligible branches
+                        if (isEligibleBranch(targetBranch)) {
+                            env.APP_VERSION = sh(returnStdout: true, script: "npm version ${versionType} --no-git-tag-version").trim()
+                            sh "echo 'New version: ${env.APP_VERSION}'"
+                        } else {
+                            env.APP_VERSION = currentPackageVersion
+                            sh "echo 'Using existing version (non-eligible branch): ${env.APP_VERSION}'"
+                        }
                     }
                 }
             }
@@ -168,7 +189,9 @@ pipeline {
         stage('Docker Push') {
             when {
                 expression {
-                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false'
+                    def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
+                    def targetBranch = env.BRANCH_NAME ?: (checkedOutBranch == 'HEAD' ? null : checkedOutBranch)
+                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false' && isEligibleBranch(targetBranch)
                 }
             }
             steps {
@@ -176,7 +199,16 @@ pipeline {
                     docker.withRegistry("https://${env.DOCKER_REGISTRY}", "docker_registry_credentials") {
                         def appImage = docker.image("${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}")
                         appImage.push()
-                        appImage.push('latest')
+                        
+                        // Only push 'latest' tag from master branch
+                        def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
+                        def targetBranch = env.BRANCH_NAME ?: (checkedOutBranch == 'HEAD' ? null : checkedOutBranch)
+                        if (targetBranch == 'master' || targetBranch == 'main') {
+                            appImage.push('latest')
+                            sh "echo 'Pushed latest tag from ${targetBranch} branch'"
+                        } else {
+                            sh "echo 'Skipping latest tag push (only done from master/main branch)'"
+                        }
                     }
                 }
             }
@@ -185,7 +217,9 @@ pipeline {
         stage('Update version, Tag, and Push to Git') {
             when {
                 expression {
-                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false'
+                    def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
+                    def targetBranch = env.BRANCH_NAME ?: (checkedOutBranch == 'HEAD' ? null : checkedOutBranch)
+                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false' && isEligibleBranch(targetBranch)
                 }
             }
             steps {
@@ -194,28 +228,15 @@ pipeline {
                         sh "git config --global user.email 'adam.stegienko1@gmail.com'"
                         sh "git config --global user.name 'Adam Stegienko'"
                         
-                        // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to the actual checked-out git branch
+                        // Determine target branch
                         def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
                         def targetBranch = env.BRANCH_NAME ?: (checkedOutBranch == 'HEAD' ? null : checkedOutBranch)
                         sh "echo 'Detected checked-out branch: ${checkedOutBranch}'"
-                        sh "echo 'Target branch for version update: ${targetBranch ?: 'none (detached)'}'"
+                        sh "echo 'Target branch for version update: ${targetBranch}'"
 
-                        // Only push/tag for protected branches: master, main, release/*
-                        def doPush = false
-                        if (targetBranch) {
-                            if (targetBranch == 'master' || targetBranch == 'main' || (targetBranch ==~ /release\/.*$/)) {
-                                doPush = true
-                            }
-                        }
-
-                        if (!doPush) {
-                            sh "echo 'Skipping push/tag: branch not eligible for remote push (detached or non-release branch)'; exit 0"
-                        }
-
-                        // Proceed with push/tag workflow for eligible branches
                         sh """
                         set -e
-                        # stash any local changes (safe because we only operate on eligible branches)
+                        # stash any local changes
                         git stash push -u -m "jenkins-autostash" || true
 
                         # checkout target branch and make sure it's up-to-date
@@ -236,7 +257,7 @@ pipeline {
                             git commit -m "new version: ${env.APP_VERSION} [skip ci]"
                         fi
 
-                        # Create tag (idempotent if tag already exists will fail)
+                        # Create tag
                         git tag ${env.APP_VERSION} || echo 'Tag already exists or failed to create tag'
 
                         # Push branch and tag
