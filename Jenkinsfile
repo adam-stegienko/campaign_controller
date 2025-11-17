@@ -67,11 +67,11 @@ pipeline {
         stage('Start') {
             steps {
                 script {
-                    def targetBranch = env.BRANCH_NAME ?: sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
-                    sh "echo 'Building branch: ${targetBranch}'"
+                    def targetBranch = env.BRANCH_NAME
+                    sh "echo 'Building branch: ${targetBranch ?: 'unknown'}'"
                     
                     if (!isEligibleBranch(targetBranch)) {
-                        sh "echo 'WARNING: Branch ${targetBranch} is not master, main, or release/*. Build will proceed but version tagging and push will be skipped.'"
+                        sh "echo 'WARNING: Branch ${targetBranch ?: 'unknown'} is not master, main, or release/*. Build will proceed but version tagging and push will be skipped.'"
                     }
                     
                     step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Pipeline started"]])
@@ -91,7 +91,19 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                checkout scm
+                script {
+                    checkout scm
+                    
+                    // If we have a BRANCH_NAME, checkout that branch explicitly to avoid detached HEAD
+                    if (env.BRANCH_NAME) {
+                        sshagent(['jenkins_github_np']) {
+                            sh """
+                            git checkout ${env.BRANCH_NAME} || git checkout -b ${env.BRANCH_NAME} origin/${env.BRANCH_NAME}
+                            git pull origin ${env.BRANCH_NAME} || true
+                            """
+                        }
+                    }
+                }
             }
         }
 
