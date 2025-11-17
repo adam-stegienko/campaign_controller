@@ -77,9 +77,6 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                // Use the SCM configuration provided by the Jenkins job (multibranch or job-level branch specifier).
-                // This ensures Jenkins checks out the branch that triggered the job (BRANCH_NAME) or
-                // the branch configured in the multibranch pipeline job instead of forcing master.
                 checkout scm
             }
         }
