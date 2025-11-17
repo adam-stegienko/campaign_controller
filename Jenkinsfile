@@ -68,6 +68,7 @@ pipeline {
             steps {
                 script {
                     def targetBranch = env.BRANCH_NAME
+                    sh "echo 'branch name ${env.BRANCH_NAME}, git branch ${GIT_BRANCH}'"
                     sh "echo 'Building branch: ${targetBranch ?: 'unknown'}'"
                     
                     if (!isEligibleBranch(targetBranch)) {
