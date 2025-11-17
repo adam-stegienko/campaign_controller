@@ -37,6 +37,11 @@ def DUPLICATED_TAG = 'false'
 
 pipeline {
     agent any
+    
+    triggers {
+        githubPush()  // GitHub hook trigger for GITScm polling
+    }
+    
     environment {
         APP_NAME = 'campaign-controller-ui'
         SONAR_SERVER = 'LabSonarQube'
