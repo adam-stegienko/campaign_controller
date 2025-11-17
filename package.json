@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "campaign-controller",
-  "version": "0.8.12",
+  "version": "0.8.13",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
