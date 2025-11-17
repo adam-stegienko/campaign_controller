@@ -80,15 +80,6 @@ pipeline {
             }
         }
 
-        stage('Clean Workspace') {
-            steps {
-                sshagent(['jenkins_github_np']) {
-                    cleanGit()
-                    sh 'git tag -d $(git tag -l) > /dev/null 2>&1 || true'
-                }
-            }
-        }
-
         stage('Checkout') {
             steps {
                 script {
@@ -98,11 +89,14 @@ pipeline {
                     if (env.BRANCH_NAME) {
                         sshagent(['jenkins_github_np']) {
                             sh """
+                            git fetch origin
                             git checkout ${env.BRANCH_NAME} || git checkout -b ${env.BRANCH_NAME} origin/${env.BRANCH_NAME}
-                            git pull origin ${env.BRANCH_NAME} || true
+                            git reset --hard origin/${env.BRANCH_NAME}
                             """
                         }
                     }
+                    
+                    sh 'git tag -d $(git tag -l) > /dev/null 2>&1 || true'
                 }
             }
         }
