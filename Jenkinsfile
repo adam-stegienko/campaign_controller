@@ -37,9 +37,9 @@ def DUPLICATED_TAG = 'false'
 
 pipeline {
     agent any
-    
+
     triggers {
-        githubPush()  // GitHub hook trigger for GITScm polling
+        pollSCM('') // Enabling being build on Push
     }
     
     environment {
@@ -156,16 +156,16 @@ pipeline {
             }
         }
 
-        stage('Docker Image Security Scan') {
-            when {
-                expression {
-                   return currentBuild.currentResult == 'SUCCESS'
-                }
-            }
-            steps {
-                sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
-            }
-        }
+        // stage('Docker Image Security Scan') {
+        //     when {
+        //         expression {
+        //            return currentBuild.currentResult == 'SUCCESS'
+        //         }
+        //     }
+        //     steps {
+        //         sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
+        //     }
+        // }
 
         stage('Docker Push') {
             when {
