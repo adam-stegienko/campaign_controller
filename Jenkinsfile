@@ -33,13 +33,6 @@ def cleanGit() {
     sh 'git clean -fdx'
 }
 
-def isEligibleBranch(branchName) {
-    if (!branchName) {
-        return false
-    }
-    return branchName == 'master' || branchName == 'main' || branchName ==~ /^release\/.*$/
-}
-
 def DUPLICATED_TAG = 'false'
 
 pipeline {
@@ -67,48 +60,30 @@ pipeline {
         stage('Start') {
             steps {
                 script {
-                    def targetBranch = env.BRANCH_NAME
-                    sh "echo 'branch name ${env.BRANCH_NAME}, git branch ${GIT_BRANCH}'"
-                    sh "echo 'Building branch: ${targetBranch ?: 'unknown'}'"
-                    
-                    if (!isEligibleBranch(targetBranch)) {
-                        sh "echo 'WARNING: Branch ${targetBranch ?: 'unknown'} is not master, main, or release/*. Build will proceed but version tagging and push will be skipped.'"
-                    }
-                    
                     step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Pipeline started"]])
                     step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: "Build started", state: "PENDING"]]]])
                 }
             }
         }
 
+        stage('Clean Workspace') {
+            steps {
+                sshagent(['jenkins_github_np']) {
+                    cleanGit()
+                    sh 'git tag -d $(git tag -l) > /dev/null 2>&1'
+                }
+            }
+        }
+
         stage('Checkout') {
             steps {
-                script {
-                    checkout scm
-                    
-                    sshagent(['jenkins_github_np']) {
-                        sh """
-                        git fetch origin
-                        git checkout ${env.BRANCH_NAME}
-                        git reset --hard origin/${env.BRANCH_NAME}
-                        git tag -d \$(git tag -l) > /dev/null 2>&1 || true
-                        """
-                        
-                        sh "echo 'Checked out branch: ${env.BRANCH_NAME}'"
-                    }
-                }
+                checkout scm
             }
         }
 
         stage('Calculate Version') {
             steps {
                 script {
-                    sh "echo 'Building branch: ${env.BRANCH_NAME}'"
-                    
-                    if (!isEligibleBranch(env.BRANCH_NAME)) {
-                        sh "echo 'WARNING: Branch ${env.BRANCH_NAME} is not master, main, or release/*. Version tagging and push will be skipped.'"
-                    }
-                    
                     // Get current version from package.json
                     def currentPackageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
                     
@@ -134,21 +109,16 @@ pipeline {
                     if (latestCommitTag) {
                         DUPLICATED_TAG = 'true'
                         env.APP_VERSION = currentPackageVersion
-                        sh "echo 'Tag ${latestCommitTag} already exists for the latest commit. DUPLICATED_TAG env var is set to: ${DUPLICATED_TAG}'"
+                        sh "echo 'Tag ${latestCommitTag} already exists for the latest commit. DUPLICATED_TAG env var is set to: '${DUPLICATED_TAG}"
                     } else {
                         sh "echo 'Current package.json version: ${currentPackageVersion}'"
                         sh "echo 'Latest git tag: ${latestTag}'"
                         sh "echo 'Version increment type: ${versionType}'"
                         sh "echo 'DUPLICATED_TAG: ${DUPLICATED_TAG}'"
                         
-                        // Only increment version for eligible branches
-                        if (isEligibleBranch(env.BRANCH_NAME)) {
-                            env.APP_VERSION = sh(returnStdout: true, script: "npm version ${versionType} --no-git-tag-version").trim()
-                            sh "echo 'New version: ${env.APP_VERSION}'"
-                        } else {
-                            env.APP_VERSION = currentPackageVersion
-                            sh "echo 'Using existing version (non-eligible branch): ${env.APP_VERSION}'"
-                        }
+                        // Use npm version to increment and get the new version
+                        env.APP_VERSION = sh(returnStdout: true, script: "npm version ${versionType} --no-git-tag-version").trim()
+                        sh "echo 'New version: ${env.APP_VERSION}'"
                     }
                 }
             }
@@ -181,21 +151,21 @@ pipeline {
             }
         }
 
-        // stage('Docker Image Security Scan') {
-        //     when {
-        //         expression {
-        //            return currentBuild.currentResult == 'SUCCESS'
-        //         }
-        //     }
-        //     steps {
-        //         sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
-        //     }
-        // }
+        stage('Docker Image Security Scan') {
+            when {
+                expression {
+                   return currentBuild.currentResult == 'SUCCESS'
+                }
+            }
+            steps {
+                sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
+            }
+        }
 
         stage('Docker Push') {
             when {
                 expression {
-                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false' && isEligibleBranch(env.BRANCH_NAME)
+                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false'
                 }
             }
             steps {
@@ -203,14 +173,7 @@ pipeline {
                     docker.withRegistry("https://${env.DOCKER_REGISTRY}", "docker_registry_credentials") {
                         def appImage = docker.image("${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}")
                         appImage.push()
-                        
-                        // Only push 'latest' tag from master/main branch
-                        if (env.BRANCH_NAME == 'master' || env.BRANCH_NAME == 'main') {
-                            appImage.push('latest')
-                            sh "echo 'Pushed latest tag from ${env.BRANCH_NAME} branch'"
-                        } else {
-                            sh "echo 'Skipping latest tag push (only done from master/main branch)'"
-                        }
+                        appImage.push('latest')
                     }
                 }
             }
@@ -219,7 +182,7 @@ pipeline {
         stage('Update version, Tag, and Push to Git') {
             when {
                 expression {
-                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false' && isEligibleBranch(env.BRANCH_NAME)
+                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false'
                 }
             }
             steps {
@@ -228,16 +191,19 @@ pipeline {
                         sh "git config --global user.email 'adam.stegienko1@gmail.com'"
                         sh "git config --global user.name 'Adam Stegienko'"
                         
-                        sh "echo 'Pushing version update to branch: ${env.BRANCH_NAME}'"
-
+                        // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to the actual checked-out git branch
+                        def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
+                        def targetBranch = env.BRANCH_NAME ?: checkedOutBranch ?: 'master'
+                        sh "echo 'Detected checked-out branch: ${checkedOutBranch}'"
+                        sh "echo 'Target branch for version update: ${targetBranch}'"
                         sh """
-                        set -e
-                        # stash any local changes
+                        # stash local changes first so checkout won't fail
                         git stash push -u -m "jenkins-autostash" || true
 
-                        # make sure we're up-to-date
-                        git fetch origin ${env.BRANCH_NAME}
-                        git pull --rebase origin ${env.BRANCH_NAME}
+                        # checkout target branch and make sure it's up-to-date
+                        git checkout ${targetBranch}
+                        git fetch origin ${targetBranch}
+                        git pull --rebase origin ${targetBranch} || true
 
                         # restore stashed changes if any
                         git stash pop || true
@@ -252,11 +218,20 @@ pipeline {
                             git commit -m "new version: ${env.APP_VERSION} [skip ci]"
                         fi
 
-                        # Create tag
+                        # Create tag (idempotent if tag already exists will fail)
                         git tag ${env.APP_VERSION} || echo 'Tag already exists or failed to create tag'
 
-                        # Push branch and tag
-                        git push origin ${env.BRANCH_NAME}
+                        # Try push; if rejected, retry after pulling remote changes
+                        if git push origin ${targetBranch}; then
+                            echo 'Pushed branch successfully'
+                        else
+                            echo 'Push failed; attempting rebase with remote and retry'
+                            git fetch origin ${targetBranch}
+                            git rebase origin/${targetBranch} || { echo 'Rebase failed'; exit 1; }
+                            git push origin ${targetBranch}
+                        fi
+
+                        # Push tag (may fail if tag already exists remotely)
                         git push origin tag ${env.APP_VERSION} || echo 'Push tag failed (may already exist)'
                         """
                     }
