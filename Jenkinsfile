@@ -77,19 +77,10 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/master'], [name: '*/release/*']],
-                    doGenerateSubmoduleConfigurations: 'false',
-                    extensions: [
-                        [$class: 'CloneOption', noTags: false, shallow: false]
-                    ],
-                    submoduleCfg: [],
-                    userRemoteConfigs: [[
-                        credentialsId: 'jenkins_github_np',
-                        url: 'git@github.com:adam-stegienko/campaign-controller-ui.git'
-                    ]]
-                ])
+                // Use the SCM configuration provided by the Jenkins job (multibranch or job-level branch specifier).
+                // This ensures Jenkins checks out the branch that triggered the job (BRANCH_NAME) or
+                // the branch configured in the multibranch pipeline job instead of forcing master.
+                checkout scm
             }
         }
 
@@ -203,8 +194,10 @@ pipeline {
                         sh "git config --global user.email 'adam.stegienko1@gmail.com'"
                         sh "git config --global user.name 'Adam Stegienko'"
                         
-                        // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to master
-                        def targetBranch = env.BRANCH_NAME ?: 'master'
+                        // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to the actual checked-out git branch
+                        def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
+                        def targetBranch = env.BRANCH_NAME ?: checkedOutBranch ?: 'master'
+                        sh "echo 'Detected checked-out branch: ${checkedOutBranch}'"
                         sh "echo 'Target branch for version update: ${targetBranch}'"
                         sh """
                         # stash local changes first so checkout won't fail
