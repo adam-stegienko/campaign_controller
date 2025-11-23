@@ -153,14 +153,13 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'docker_registry_credentials', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
                         // Create temporary .netrc file for curl
                         def netrcFile = "${env.WORKSPACE}/.netrc-${env.BUILD_NUMBER}"
-                        sh """
-                        cat > ${netrcFile} << 'EOF'
-machine ${env.DOCKER_REGISTRY}
-login \$REGISTRY_USER
-password \$REGISTRY_PASS
-EOF
-                        chmod 600 ${netrcFile}
-                        """
+                        
+                        // Write credentials using writeFile to ensure proper expansion
+                        writeFile file: netrcFile, text: """machine ${env.DOCKER_REGISTRY}
+login ${env.REGISTRY_USER}
+password ${env.REGISTRY_PASS}
+"""
+                        sh "chmod 600 ${netrcFile}"
                         
                         try {
                             // Calculate next Docker tag based on registry and commit SHA
