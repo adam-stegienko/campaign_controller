@@ -154,10 +154,10 @@ pipeline {
                         // Create temporary .netrc file for curl
                         def netrcFile = "${env.WORKSPACE}/.netrc-${env.BUILD_NUMBER}"
                         sh """
-                        cat > ${netrcFile} << EOF
+                        cat > ${netrcFile} << 'EOF'
 machine ${env.DOCKER_REGISTRY}
-login \${REGISTRY_USER}
-password \${REGISTRY_PASS}
+login \$REGISTRY_USER
+password \$REGISTRY_PASS
 EOF
                         chmod 600 ${netrcFile}
                         """
