@@ -1,10 +1,10 @@
-def getLatestDockerTag(registry, imageName, majorMinor, registryUser, registryPass) {
+def getLatestDockerTag(registry, imageName, majorMinor, credFile) {
     // Query Docker registry for tags matching major.minor pattern
     try {
         def tagsJson = sh(
             returnStdout: true,
             script: """
-            curl -s -k -u ${registryUser}:${registryPass} https://${registry}/v2/${imageName}/tags/list | \
+            curl -s -k --netrc-file ${credFile} https://${registry}/v2/${imageName}/tags/list | \
             jq -r '.tags // [] | .[]' | \
             grep -E '^${majorMinor}\\.[0-9]+' | \
             sort -V | \
@@ -40,7 +40,7 @@ def getImageCommitSHA(registry, imageName, tag) {
     }
 }
 
-def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA, registryUser, registryPass) {
+def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA, credFile) {
     // Extract major.minor from package.json version (e.g., "0.10.0-dev" -> "0.10")
     def versionParts = baseVersion.tokenize('.')
     def major = versionParts[0]
@@ -57,7 +57,7 @@ def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA, reg
     def majorMinor = "${major}.${minor}"
     
     // Get latest patch version from Docker registry
-    def latestTag = getLatestDockerTag(registry, imageName, majorMinor, registryUser, registryPass)
+    def latestTag = getLatestDockerTag(registry, imageName, majorMinor, credFile)
     
     if (latestTag) {
         sh "echo 'Latest tag in registry: ${latestTag}'"
@@ -149,10 +149,26 @@ pipeline {
                     def packageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
                     sh "echo 'Package.json version: ${packageVersion}'"
                     
-                    // Use Docker registry credentials
+                    // Use Docker registry credentials via netrc file (more secure)
                     withCredentials([usernamePassword(credentialsId: 'docker_registry_credentials', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
-                        // Calculate next Docker tag based on registry and commit SHA
-                        env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA, env.REGISTRY_USER, env.REGISTRY_PASS)
+                        // Create temporary .netrc file for curl
+                        def netrcFile = "${env.WORKSPACE}/.netrc-${env.BUILD_NUMBER}"
+                        sh """
+                        cat > ${netrcFile} << EOF
+machine ${env.DOCKER_REGISTRY}
+login \${REGISTRY_USER}
+password \${REGISTRY_PASS}
+EOF
+                        chmod 600 ${netrcFile}
+                        """
+                        
+                        try {
+                            // Calculate next Docker tag based on registry and commit SHA
+                            env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA, netrcFile)
+                        } finally {
+                            // Clean up credentials file
+                            sh "rm -f ${netrcFile}"
+                        }
                     }
                     
                     env.GIT_COMMIT_SHA = currentCommitSHA
