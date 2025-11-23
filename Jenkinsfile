@@ -1,11 +1,11 @@
-def getLatestDockerTag(registry, imageName, majorMinor) {
+def getLatestDockerTag(registry, imageName, majorMinor, registryUser, registryPass) {
     // Query Docker registry for tags matching major.minor pattern
     try {
         def tagsJson = sh(
             returnStdout: true,
             script: """
-            curl -s -k https://${registry}/v2/${imageName}/tags/list | \
-            jq -r '.tags[]' | \
+            curl -s -k -u ${registryUser}:${registryPass} https://${registry}/v2/${imageName}/tags/list | \
+            jq -r '.tags // [] | .[]' | \
             grep -E '^${majorMinor}\\.[0-9]+' | \
             sort -V | \
             tail -n 1
@@ -30,7 +30,7 @@ def getImageCommitSHA(registry, imageName, tag) {
             script: """
             docker pull ${registry}/${imageName}:${tag} > /dev/null 2>&1 || true
             docker inspect ${registry}/${imageName}:${tag} 2>/dev/null | \
-            jq -r '.[0].Config.Labels.\"git.commit.sha\"' || echo ''
+            jq -r '.[0].Config.Labels."git.commit.sha" // empty' || echo ''
             """
         ).trim()
         
@@ -40,7 +40,7 @@ def getImageCommitSHA(registry, imageName, tag) {
     }
 }
 
-def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA) {
+def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA, registryUser, registryPass) {
     // Extract major.minor from package.json version (e.g., "0.10.0-dev" -> "0.10")
     def versionParts = baseVersion.tokenize('.')
     def major = versionParts[0]
@@ -57,7 +57,7 @@ def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA) {
     def majorMinor = "${major}.${minor}"
     
     // Get latest patch version from Docker registry
-    def latestTag = getLatestDockerTag(registry, imageName, majorMinor)
+    def latestTag = getLatestDockerTag(registry, imageName, majorMinor, registryUser, registryPass)
     
     if (latestTag) {
         sh "echo 'Latest tag in registry: ${latestTag}'"
@@ -149,10 +149,10 @@ pipeline {
                     def packageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
                     sh "echo 'Package.json version: ${packageVersion}'"
                     
-                    // Use Docker registry credentials for API access
-                    docker.withRegistry("https://${env.DOCKER_REGISTRY}", "docker_registry_credentials") {
+                    // Use Docker registry credentials
+                    withCredentials([usernamePassword(credentialsId: 'docker_registry_credentials', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
                         // Calculate next Docker tag based on registry and commit SHA
-                        env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA)
+                        env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA, env.REGISTRY_USER, env.REGISTRY_PASS)
                     }
                     
                     env.GIT_COMMIT_SHA = currentCommitSHA
