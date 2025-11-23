@@ -25,14 +25,16 @@ def getLatestDockerTag(registry, imageName, majorMinor, credFile) {
 def getImageCommitSHA(registry, imageName, tag) {
     // Get the commit SHA from Docker image labels
     try {
-        def manifest = sh(
-            returnStdout: true,
-            script: """
-            docker pull ${registry}/${imageName}:${tag} > /dev/null 2>&1 || true
-            docker inspect ${registry}/${imageName}:${tag} 2>/dev/null | \
-            jq -r '.[0].Config.Labels."git.commit.sha" // empty' || echo ''
-            """
-        ).trim()
+        def manifest = withEnv(["REGISTRY=${registry}", "IMAGE_NAME=${imageName}", "TAG=${tag}"]) {
+            sh(
+                returnStdout: true,
+                script: '''
+                docker pull ${REGISTRY}/${IMAGE_NAME}:${TAG} > /dev/null 2>&1 || true
+                docker inspect ${REGISTRY}/${IMAGE_NAME}:${TAG} 2>/dev/null | \
+                jq -r '.[0].Config.Labels."git.commit.sha" // empty' || echo ""
+                '''
+            ).trim()
+        }
         
         return manifest ?: null
     } catch (Exception e) {
