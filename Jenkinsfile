@@ -117,24 +117,6 @@ pipeline {
         stage('Start') {
             steps {
                 script {
-                    // Ensure jq is installed
-                    sh """
-                    if ! command -v jq &> /dev/null; then
-                        echo 'jq not found, attempting to install...'
-                        if command -v apt-get &> /dev/null; then
-                            sudo apt-get update && sudo apt-get install -y jq
-                        elif command -v yum &> /dev/null; then
-                            sudo yum install -y jq
-                        elif command -v brew &> /dev/null; then
-                            brew install jq
-                        else
-                            echo 'ERROR: Cannot install jq - no package manager found'
-                            exit 1
-                        fi
-                    fi
-                    jq --version
-                    """
-                    
                     step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Pipeline started"]])
                     step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: "Build started", state: "PENDING"]]]])
                 }
