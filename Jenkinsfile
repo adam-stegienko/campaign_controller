@@ -1,30 +1,58 @@
-def calculateVersion(latestTag) {
-    def (major, minor, patch) = latestTag.tokenize('.')
-
-    // Fetch the latest commit message
-    def commitMessage = sh(returnStdout: true, script: 'git log -1 --pretty=%B').trim()
-
-    // Increment the version based on conventional commit standards
-    if (commitMessage.toLowerCase().contains('breaking change') || 
-        commitMessage.toLowerCase().contains('major:') ||
-        commitMessage.toLowerCase().startsWith('feat!') ||
-        commitMessage.toLowerCase().startsWith('fix!')) {
-        return 'major'
-    } else if (commitMessage.toLowerCase().startsWith('feat') || 
-               commitMessage.toLowerCase().contains('minor:')) {
-        return 'minor'
-    } else if (commitMessage.toLowerCase().startsWith('fix') ||
-               commitMessage.toLowerCase().startsWith('docs') ||
-               commitMessage.toLowerCase().startsWith('style') ||
-               commitMessage.toLowerCase().startsWith('refactor') ||
-               commitMessage.toLowerCase().startsWith('perf') ||
-               commitMessage.toLowerCase().startsWith('test') ||
-               commitMessage.toLowerCase().startsWith('chore') ||
-               commitMessage.toLowerCase().contains('patch:')) {
-        return 'patch'
-    } else {
-        return 'patch'  // Default to patch increment
+def getLatestDockerTag(registry, imageName, majorMinor) {
+    // Query Docker registry for tags matching major.minor pattern
+    try {
+        def tagsJson = sh(
+            returnStdout: true,
+            script: """
+            curl -s -k https://${registry}/v2/${imageName}/tags/list | \
+            jq -r '.tags[]' | \
+            grep -E '^${majorMinor}\\.[0-9]+\$' | \
+            sort -V | \
+            tail -n 1
+            """
+        ).trim()
+        
+        if (tagsJson) {
+            return tagsJson
+        }
+        return null
+    } catch (Exception e) {
+        sh "echo 'Could not fetch tags from registry: ${e.message}'"
+        return null
     }
+}
+
+def calculateNextVersion(registry, imageName, baseVersion) {
+    // Extract major.minor from package.json version (e.g., "0.10.0-dev" -> "0.10")
+    def versionParts = baseVersion.tokenize('.')
+    def major = versionParts[0]
+    def minor = versionParts[1]
+    
+    // Extract suffix if present (e.g., "0-dev" -> "-dev")
+    def suffix = ""
+    def patchPart = versionParts[2]
+    if (patchPart.contains('-')) {
+        def patchSplit = patchPart.split('-', 2)
+        suffix = "-${patchSplit[1]}"
+    }
+    
+    def majorMinor = "${major}.${minor}"
+    
+    // Get latest patch version from Docker registry (search without suffix)
+    def latestTag = getLatestDockerTag(registry, imageName, majorMinor)
+    
+    def nextPatch = 0
+    if (latestTag) {
+        // Extract patch number from tag (e.g., "0.10.5-dev" or "0.10.5" -> 5)
+        def latestPatchPart = latestTag.tokenize('.')[2]
+        def latestPatchNum = latestPatchPart.split('-')[0].toInteger()
+        nextPatch = latestPatchNum + 1
+        sh "echo 'Latest tag in registry: ${latestTag}'"
+    } else {
+        sh "echo 'No existing tags found for ${majorMinor}.x, starting from 0'"
+    }
+    
+    return "${majorMinor}.${nextPatch}${suffix}"
 }
 
 def cleanGit() {
@@ -32,8 +60,6 @@ def cleanGit() {
     sh 'git reset --hard'
     sh 'git clean -fdx'
 }
-
-def DUPLICATED_TAG = 'false'
 
 pipeline {
     agent any
@@ -89,42 +115,13 @@ pipeline {
         stage('Calculate Version') {
             steps {
                 script {
-                    // Get current version from package.json
-                    def currentPackageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
+                    // Get version from package.json (e.g., "0.10.0-dev" or "0.9.0")
+                    def packageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
+                    sh "echo 'Package.json version: ${packageVersion}'"
                     
-                    // Get latest git tag
-                    def latestTag = currentPackageVersion
-                    try {
-                        latestTag = sh(returnStdout: true, script: 'git tag | sort -Vr | head -n 1').trim()
-                        if (!latestTag) {
-                            latestTag = currentPackageVersion
-                        }
-                    } catch (Exception e) {
-                        latestTag = currentPackageVersion
-                    }
-                    
-                    def versionType = calculateVersion(latestTag)
-
-                    // Check if the latest commit already has a tag
-                    def latestCommitTag = ''
-                    try {
-                        latestCommitTag = sh(returnStdout: true, script: 'git tag --contains HEAD').trim()
-                    } catch (Exception e) {}
-                    
-                    if (latestCommitTag) {
-                        DUPLICATED_TAG = 'true'
-                        env.APP_VERSION = currentPackageVersion
-                        sh "echo 'Tag ${latestCommitTag} already exists for the latest commit. DUPLICATED_TAG env var is set to: '${DUPLICATED_TAG}"
-                    } else {
-                        sh "echo 'Current package.json version: ${currentPackageVersion}'"
-                        sh "echo 'Latest git tag: ${latestTag}'"
-                        sh "echo 'Version increment type: ${versionType}'"
-                        sh "echo 'DUPLICATED_TAG: ${DUPLICATED_TAG}'"
-                        
-                        // Use npm version to increment and get the new version
-                        env.APP_VERSION = sh(returnStdout: true, script: "npm version ${versionType} --no-git-tag-version").trim()
-                        sh "echo 'New version: ${env.APP_VERSION}'"
-                    }
+                    // Calculate next Docker tag based on registry
+                    env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion)
+                    sh "echo 'Docker tag to build: ${env.APP_VERSION}'"
                 }
             }
         }
@@ -170,7 +167,7 @@ pipeline {
         stage('Docker Push') {
             when {
                 expression {
-                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false'
+                    return currentBuild.currentResult == 'SUCCESS'
                 }
             }
             steps {
@@ -178,68 +175,24 @@ pipeline {
                     docker.withRegistry("https://${env.DOCKER_REGISTRY}", "docker_registry_credentials") {
                         def appImage = docker.image("${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}")
                         appImage.push()
-                        appImage.push('latest')
+                        
+                        // Only push 'latest' tag for master branch
+                        if (env.BRANCH_NAME == 'master') {
+                            appImage.push('latest')
+                            sh "echo 'Pushed latest tag for master branch'"
+                        } else {
+                            sh "echo 'Skipping latest tag (only master branch gets latest tag)'"
+                        }
                     }
                 }
             }
         }
 
-        stage('Update version, Tag, and Push to Git') {
-            when {
-                expression {
-                    return currentBuild.currentResult == 'SUCCESS' && DUPLICATED_TAG == 'false'
-                }
-            }
+        stage('Cleanup') {
             steps {
                 script {
-                    sshagent(['jenkins_github_np']) {
-                        sh "git config --global user.email 'adam.stegienko1@gmail.com'"
-                        sh "git config --global user.name 'Adam Stegienko'"
-                        
-                        // Determine target branch: prefer the Jenkins `BRANCH_NAME`, fallback to the actual checked-out git branch
-                        def checkedOutBranch = sh(returnStdout: true, script: "git rev-parse --abbrev-ref HEAD").trim()
-                        def targetBranch = env.BRANCH_NAME ?: checkedOutBranch ?: 'master'
-                        sh "echo 'Detected checked-out branch: ${checkedOutBranch}'"
-                        sh "echo 'Target branch for version update: ${targetBranch}'"
-                        sh """
-                        # stash local changes first so checkout won't fail
-                        git stash push -u -m "jenkins-autostash" || true
-
-                        # checkout target branch and make sure it's up-to-date
-                        git checkout ${targetBranch}
-                        git fetch origin ${targetBranch}
-                        git pull --rebase origin ${targetBranch} || true
-
-                        # restore stashed changes if any
-                        git stash pop || true
-
-                        # Add updated package files only if changed by npm version
-                        git add package.json package-lock.json || true
-
-                        # Commit only if there are staged changes
-                        if git diff --cached --quiet; then
-                            echo 'No changes to commit'
-                        else
-                            git commit -m "new version: ${env.APP_VERSION} [skip ci]"
-                        fi
-
-                        # Create tag (idempotent if tag already exists will fail)
-                        git tag ${env.APP_VERSION} || echo 'Tag already exists or failed to create tag'
-
-                        # Try push; if rejected, retry after pulling remote changes
-                        if git push origin ${targetBranch}; then
-                            echo 'Pushed branch successfully'
-                        else
-                            echo 'Push failed; attempting rebase with remote and retry'
-                            git fetch origin ${targetBranch}
-                            git rebase origin/${targetBranch} || { echo 'Rebase failed'; exit 1; }
-                            git push origin ${targetBranch}
-                        fi
-
-                        # Push tag (may fail if tag already exists remotely)
-                        git push origin tag ${env.APP_VERSION} || echo 'Push tag failed (may already exist)'
-                        """
-                    }
+                    sh "echo 'Build completed successfully'"
+                    sh "echo 'Docker image: ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}'"
                 }
             }
         }
