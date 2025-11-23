@@ -6,7 +6,7 @@ def getLatestDockerTag(registry, imageName, majorMinor) {
             script: """
             curl -s -k https://${registry}/v2/${imageName}/tags/list | \
             jq -r '.tags[]' | \
-            grep -E '^${majorMinor}\\.[0-9]+\$' | \
+            grep -E '^${majorMinor}\\.[0-9]+' | \
             sort -V | \
             tail -n 1
             """
@@ -22,7 +22,25 @@ def getLatestDockerTag(registry, imageName, majorMinor) {
     }
 }
 
-def calculateNextVersion(registry, imageName, baseVersion) {
+def getImageCommitSHA(registry, imageName, tag) {
+    // Get the commit SHA from Docker image labels
+    try {
+        def manifest = sh(
+            returnStdout: true,
+            script: """
+            docker pull ${registry}/${imageName}:${tag} > /dev/null 2>&1 || true
+            docker inspect ${registry}/${imageName}:${tag} 2>/dev/null | \
+            jq -r '.[0].Config.Labels.\"git.commit.sha\"' || echo ''
+            """
+        ).trim()
+        
+        return manifest ?: null
+    } catch (Exception e) {
+        return null
+    }
+}
+
+def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA) {
     // Extract major.minor from package.json version (e.g., "0.10.0-dev" -> "0.10")
     def versionParts = baseVersion.tokenize('.')
     def major = versionParts[0]
@@ -38,21 +56,29 @@ def calculateNextVersion(registry, imageName, baseVersion) {
     
     def majorMinor = "${major}.${minor}"
     
-    // Get latest patch version from Docker registry (search without suffix)
+    // Get latest patch version from Docker registry
     def latestTag = getLatestDockerTag(registry, imageName, majorMinor)
     
-    def nextPatch = 0
     if (latestTag) {
-        // Extract patch number from tag (e.g., "0.10.5-dev" or "0.10.5" -> 5)
+        sh "echo 'Latest tag in registry: ${latestTag}'"
+        
+        // Check if this tag was built from the same commit
+        def tagCommitSHA = getImageCommitSHA(registry, imageName, latestTag)
+        if (tagCommitSHA && tagCommitSHA == currentCommitSHA) {
+            sh "echo 'Tag ${latestTag} already exists for commit ${currentCommitSHA}, reusing it'"
+            return latestTag
+        }
+        
+        // Different commit, increment patch
         def latestPatchPart = latestTag.tokenize('.')[2]
         def latestPatchNum = latestPatchPart.split('-')[0].toInteger()
-        nextPatch = latestPatchNum + 1
-        sh "echo 'Latest tag in registry: ${latestTag}'"
+        def nextPatch = latestPatchNum + 1
+        sh "echo 'Incrementing patch version from ${latestPatchNum} to ${nextPatch}'"
+        return "${majorMinor}.${nextPatch}${suffix}"
     } else {
         sh "echo 'No existing tags found for ${majorMinor}.x, starting from 0'"
+        return "${majorMinor}.0${suffix}"
     }
-    
-    return "${majorMinor}.${nextPatch}${suffix}"
 }
 
 def cleanGit() {
@@ -91,6 +117,24 @@ pipeline {
         stage('Start') {
             steps {
                 script {
+                    // Ensure jq is installed
+                    sh """
+                    if ! command -v jq &> /dev/null; then
+                        echo 'jq not found, attempting to install...'
+                        if command -v apt-get &> /dev/null; then
+                            sudo apt-get update && sudo apt-get install -y jq
+                        elif command -v yum &> /dev/null; then
+                            sudo yum install -y jq
+                        elif command -v brew &> /dev/null; then
+                            brew install jq
+                        else
+                            echo 'ERROR: Cannot install jq - no package manager found'
+                            exit 1
+                        fi
+                    fi
+                    jq --version
+                    """
+                    
                     step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Pipeline started"]])
                     step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: "Build started", state: "PENDING"]]]])
                 }
@@ -115,12 +159,17 @@ pipeline {
         stage('Calculate Version') {
             steps {
                 script {
+                    // Get current commit SHA
+                    def currentCommitSHA = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+                    sh "echo 'Current commit SHA: ${currentCommitSHA}'"
+                    
                     // Get version from package.json (e.g., "0.10.0-dev" or "0.9.0")
                     def packageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
                     sh "echo 'Package.json version: ${packageVersion}'"
                     
-                    // Calculate next Docker tag based on registry
-                    env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion)
+                    // Calculate next Docker tag based on registry and commit SHA
+                    env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA)
+                    env.GIT_COMMIT_SHA = currentCommitSHA
                     sh "echo 'Docker tag to build: ${env.APP_VERSION}'"
                 }
             }
@@ -149,7 +198,13 @@ pipeline {
                 }
             }
             steps {
-                sh "docker build --build-arg APP_VERSION=${env.APP_VERSION} -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION} ."
+                sh """
+                docker build \
+                  --build-arg APP_VERSION=${env.APP_VERSION} \
+                  --label git.commit.sha=${env.GIT_COMMIT_SHA} \
+                  --label build.timestamp=\$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+                  -t ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION} .
+                """
             }
         }
 
