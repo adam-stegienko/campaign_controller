@@ -4,7 +4,7 @@ def getLatestDockerTag(registry, imageName, majorMinor, credFile) {
         def tagsJson = sh(
             returnStdout: true,
             script: """
-            curl -s -k --netrc-file ${credFile} https://${registry}/v2/${imageName}/tags/list | \
+            curl -s --netrc-file ${credFile} https://${registry}/v2/${imageName}/tags/list | \
             jq -r '.tags // [] | .[]' | \
             grep -E '^${majorMinor}\\.[0-9]+' | \
             sort -V | \
@@ -153,13 +153,19 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'docker_registry_credentials', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
                         // Create temporary .netrc file for curl
                         def netrcFile = "${env.WORKSPACE}/.netrc-${env.BUILD_NUMBER}"
+                        // Extract hostname from registry URL (remove port) for .netrc machine matching
+                        def registryHost = env.DOCKER_REGISTRY.split(':')[0]
                         
-                        // Write credentials using writeFile to ensure proper expansion
-                        writeFile file: netrcFile, text: """machine ${env.DOCKER_REGISTRY}
-login ${env.REGISTRY_USER}
-password ${env.REGISTRY_PASS}
-"""
-                        sh "chmod 600 ${netrcFile}"
+                        // Create netrc file using shell to avoid Groovy interpolation of secrets
+                        // Use unquoted EOF to allow shell variable expansion of REGISTRY_USER/PASS
+                        sh """
+                        cat > ${netrcFile} <<EOF
+machine ${registryHost}
+login \$REGISTRY_USER
+password \$REGISTRY_PASS
+EOF
+                        chmod 600 ${netrcFile}
+                        """
                         
                         try {
                             // Calculate next Docker tag based on registry and commit SHA
