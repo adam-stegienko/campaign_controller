@@ -5,7 +5,7 @@ def getLatestDockerTag(registry, imageName, majorMinor) {
             returnStdout: true,
             script: """
             curl -s -k https://${registry}/v2/${imageName}/tags/list | \
-            jq -r '.tags[]' | \
+            jq -r '.tags // [] | .[]' | \
             grep -E '^${majorMinor}\\.[0-9]+' | \
             sort -V | \
             tail -n 1
