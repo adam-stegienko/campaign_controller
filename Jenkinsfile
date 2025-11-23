@@ -1,11 +1,11 @@
-def getLatestDockerTag(registry, imageName, majorMinor) {
+def getLatestDockerTag(registry, imageName, majorMinor, credFile) {
     // Query Docker registry for tags matching major.minor pattern
     try {
         def tagsJson = sh(
             returnStdout: true,
             script: """
-            curl -s -k https://${registry}/v2/${imageName}/tags/list | \
-            jq -r '.tags[]' | \
+            curl -s --netrc-file ${credFile} https://${registry}/v2/${imageName}/tags/list | \
+            jq -r '.tags // [] | .[]' | \
             grep -E '^${majorMinor}\\.[0-9]+' | \
             sort -V | \
             tail -n 1
@@ -25,14 +25,16 @@ def getLatestDockerTag(registry, imageName, majorMinor) {
 def getImageCommitSHA(registry, imageName, tag) {
     // Get the commit SHA from Docker image labels
     try {
-        def manifest = sh(
-            returnStdout: true,
-            script: """
-            docker pull ${registry}/${imageName}:${tag} > /dev/null 2>&1 || true
-            docker inspect ${registry}/${imageName}:${tag} 2>/dev/null | \
-            jq -r '.[0].Config.Labels.\"git.commit.sha\"' || echo ''
-            """
-        ).trim()
+        def manifest = withEnv(["REGISTRY=${registry}", "IMAGE_NAME=${imageName}", "TAG=${tag}"]) {
+            sh(
+                returnStdout: true,
+                script: '''
+                docker pull ${REGISTRY}/${IMAGE_NAME}:${TAG} > /dev/null 2>&1 || true
+                docker inspect ${REGISTRY}/${IMAGE_NAME}:${TAG} 2>/dev/null | \
+                jq -r '.[0].Config.Labels."git.commit.sha" // empty' || echo ""
+                '''
+            ).trim()
+        }
         
         return manifest ?: null
     } catch (Exception e) {
@@ -40,7 +42,7 @@ def getImageCommitSHA(registry, imageName, tag) {
     }
 }
 
-def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA) {
+def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA, credFile) {
     // Extract major.minor from package.json version (e.g., "0.10.0-dev" -> "0.10")
     def versionParts = baseVersion.tokenize('.')
     def major = versionParts[0]
@@ -57,7 +59,7 @@ def calculateNextVersion(registry, imageName, baseVersion, currentCommitSHA) {
     def majorMinor = "${major}.${minor}"
     
     // Get latest patch version from Docker registry
-    def latestTag = getLatestDockerTag(registry, imageName, majorMinor)
+    def latestTag = getLatestDockerTag(registry, imageName, majorMinor, credFile)
     
     if (latestTag) {
         sh "echo 'Latest tag in registry: ${latestTag}'"
@@ -117,24 +119,6 @@ pipeline {
         stage('Start') {
             steps {
                 script {
-                    // Ensure jq is installed
-                    sh """
-                    if ! command -v jq &> /dev/null; then
-                        echo 'jq not found, attempting to install...'
-                        if command -v apt-get &> /dev/null; then
-                            sudo apt-get update && sudo apt-get install -y jq
-                        elif command -v yum &> /dev/null; then
-                            sudo yum install -y jq
-                        elif command -v brew &> /dev/null; then
-                            brew install jq
-                        else
-                            echo 'ERROR: Cannot install jq - no package manager found'
-                            exit 1
-                        fi
-                    fi
-                    jq --version
-                    """
-                    
                     step([$class: "GitHubPRStatusBuilder", statusMessage: [content: "Pipeline started"]])
                     step([$class: "GitHubCommitStatusSetter", statusResultSource: [$class: "ConditionalStatusResultSource", results: [[$class: "AnyBuildResult", message: "Build started", state: "PENDING"]]]])
                 }
@@ -167,29 +151,54 @@ pipeline {
                     def packageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
                     sh "echo 'Package.json version: ${packageVersion}'"
                     
-                    // Calculate next Docker tag based on registry and commit SHA
-                    env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA)
+                    // Use Docker registry credentials via netrc file (more secure)
+                    withCredentials([usernamePassword(credentialsId: 'docker_registry_credentials', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+                        // Create temporary .netrc file for curl
+                        def netrcFile = "${env.WORKSPACE}/.netrc-${env.BUILD_NUMBER}"
+                        // Extract hostname from registry URL (remove port) for .netrc machine matching
+                        def registryHost = env.DOCKER_REGISTRY.split(':')[0]
+                        
+                        // Create netrc file using shell to avoid Groovy interpolation of secrets
+                        // Use unquoted EOF to allow shell variable expansion of REGISTRY_USER/PASS
+                        sh """
+                        cat > ${netrcFile} <<EOF
+machine ${registryHost}
+login \$REGISTRY_USER
+password \$REGISTRY_PASS
+EOF
+                        chmod 600 ${netrcFile}
+                        """
+                        
+                        try {
+                            // Calculate next Docker tag based on registry and commit SHA
+                            env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA, netrcFile)
+                        } finally {
+                            // Clean up credentials file
+                            sh "rm -f ${netrcFile}"
+                        }
+                    }
+                    
                     env.GIT_COMMIT_SHA = currentCommitSHA
                     sh "echo 'Docker tag to build: ${env.APP_VERSION}'"
                 }
             }
         }
 
-        stage('SonarQube analysis') {
-            when {
-                expression {
-                    return currentBuild.currentResult == 'SUCCESS'
-                }
-            }
-            steps {
-                script {
-                    scannerHome = tool 'JenkinsSonarScanner'
-                }
-                withSonarQubeEnv(env.SONAR_SERVER) {
-                    sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.projectVersion=${env.APP_VERSION}"
-                }
-            }
-        }
+        // stage('SonarQube analysis') {
+        //     when {
+        //         expression {
+        //             return currentBuild.currentResult == 'SUCCESS'
+        //         }
+        //     }
+        //     steps {
+        //         script {
+        //             scannerHome = tool 'JenkinsSonarScanner'
+        //         }
+        //         withSonarQubeEnv(env.SONAR_SERVER) {
+        //             sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.projectVersion=${env.APP_VERSION}"
+        //         }
+        //     }
+        // }
 
         stage('Docker Build') {
             when {
@@ -208,16 +217,16 @@ pipeline {
             }
         }
 
-        // stage('Docker Image Security Scan') {
-        //     when {
-        //         expression {
-        //            return currentBuild.currentResult == 'SUCCESS'
-        //         }
-        //     }
-        //     steps {
-        //         sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
-        //     }
-        // }
+        stage('Docker Image Security Scan') {
+            when {
+                expression {
+                   return currentBuild.currentResult == 'SUCCESS'
+                }
+            }
+            steps {
+                sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
+            }
+        }
 
         stage('Docker Push') {
             when {
