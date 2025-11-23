@@ -187,7 +187,7 @@ EOF
         stage('SonarQube analysis') {
             when {
                 expression {
-                    return currentBuild.currentResult == 'SUCCESS'
+                    return currentBuild.currentResult == 'SUCCESS' && env.BRANCH_NAME == 'master'
                 }
             }
             steps {
@@ -217,16 +217,16 @@ EOF
             }
         }
 
-        // stage('Docker Image Security Scan') {
-        //     when {
-        //         expression {
-        //            return currentBuild.currentResult == 'SUCCESS'
-        //         }
-        //     }
-        //     steps {
-        //         sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
-        //     }
-        // }
+        stage('Docker Image Security Scan') {
+            when {
+                expression {
+                   return currentBuild.currentResult == 'SUCCESS' && env.BRANCH_NAME?.startsWith('release/')
+                }
+            }
+            steps {
+                sh "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --severity HIGH,CRITICAL --exit-code 0 ${env.DOCKER_REGISTRY}/${env.APP_NAME}:${env.APP_VERSION}"
+            }
+        }
 
         stage('Docker Push') {
             when {
