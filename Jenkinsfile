@@ -5,7 +5,7 @@ def getLatestDockerTag(registry, imageName, majorMinor) {
             returnStdout: true,
             script: """
             curl -s -k https://${registry}/v2/${imageName}/tags/list | \
-            jq -r '.tags // [] | .[]' | \
+            jq -r '.tags[]' | \
             grep -E '^${majorMinor}\\.[0-9]+' | \
             sort -V | \
             tail -n 1
@@ -149,8 +149,12 @@ pipeline {
                     def packageVersion = sh(returnStdout: true, script: 'node -p "require(\'./package.json\').version"').trim()
                     sh "echo 'Package.json version: ${packageVersion}'"
                     
-                    // Calculate next Docker tag based on registry and commit SHA
-                    env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA)
+                    // Use Docker registry credentials for API access
+                    docker.withRegistry("https://${env.DOCKER_REGISTRY}", "docker_registry_credentials") {
+                        // Calculate next Docker tag based on registry and commit SHA
+                        env.APP_VERSION = calculateNextVersion(env.DOCKER_REGISTRY, env.APP_NAME, packageVersion, currentCommitSHA)
+                    }
+                    
                     env.GIT_COMMIT_SHA = currentCommitSHA
                     sh "echo 'Docker tag to build: ${env.APP_VERSION}'"
                 }
