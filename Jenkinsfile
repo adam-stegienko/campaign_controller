@@ -184,21 +184,21 @@ EOF
             }
         }
 
-        // stage('SonarQube analysis') {
-        //     when {
-        //         expression {
-        //             return currentBuild.currentResult == 'SUCCESS'
-        //         }
-        //     }
-        //     steps {
-        //         script {
-        //             scannerHome = tool 'JenkinsSonarScanner'
-        //         }
-        //         withSonarQubeEnv(env.SONAR_SERVER) {
-        //             sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.projectVersion=${env.APP_VERSION}"
-        //         }
-        //     }
-        // }
+        stage('SonarQube analysis') {
+            when {
+                expression {
+                    return currentBuild.currentResult == 'SUCCESS' && env.BRANCH_NAME == 'master'
+                }
+            }
+            steps {
+                script {
+                    scannerHome = tool 'JenkinsSonarScanner'
+                }
+                withSonarQubeEnv(env.SONAR_SERVER) {
+                    sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${env.SONAR_PROJECT_KEY} -Dsonar.projectName='${env.SONAR_PROJECT_NAME}' -Dsonar.projectVersion=${env.APP_VERSION}"
+                }
+            }
+        }
 
         stage('Docker Build') {
             when {
@@ -220,7 +220,7 @@ EOF
         stage('Docker Image Security Scan') {
             when {
                 expression {
-                   return currentBuild.currentResult == 'SUCCESS'
+                   return currentBuild.currentResult == 'SUCCESS' && env.BRANCH_NAME?.startsWith('release/')
                 }
             }
             steps {
