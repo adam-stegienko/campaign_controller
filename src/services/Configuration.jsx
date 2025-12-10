@@ -50,6 +50,11 @@ class Configuration {
     
     return this.config[key];
   }
+
+  // Expose loaded state for consumers
+  isConfigLoaded() {
+    return this.isLoaded;
+  }
 }
 
 // Create and export a singleton instance
