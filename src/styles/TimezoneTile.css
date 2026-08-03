@@ -1,0 +1,51 @@
+.timezone-tile {
+  margin: 16px 0 20px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid #b7cdea;
+  background: linear-gradient(135deg, #f6fbff 0%, #e7f0fa 100%);
+  box-shadow: 0 8px 18px rgba(31, 85, 139, 0.12);
+}
+
+.timezone-tile__label {
+  margin: 0;
+  color: #2d5d8b;
+  font-size: 0.82rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.timezone-tile__zone {
+  margin: 6px 0;
+  color: #10355a;
+  font-size: 1.2rem;
+}
+
+.timezone-tile__time {
+  margin: 0;
+  color: #173f6a;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.timezone-tile__hint {
+  margin: 8px 0 0;
+  color: #4f6880;
+  font-size: 0.86rem;
+}
+
+@media (max-width: 576px) {
+  .timezone-tile {
+    margin-top: 10px;
+    border-radius: 10px;
+  }
+
+  .timezone-tile__zone {
+    font-size: 1.08rem;
+  }
+
+  .timezone-tile__time {
+    font-size: 0.95rem;
+  }
+}

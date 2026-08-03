@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { ApiResponseComponent } from "./handlers/ApiResponseComponent";
 import { GoogleResponseComponent } from "./handlers/GoogleResponseComponent";
 import { PlannerbookForm } from "./forms/PlannerbookForm";
+import { TimezoneTile } from "./components/TimezoneTile";
 import "./styles/container.css"
 
 function useApiResponse() {
@@ -19,6 +20,7 @@ function App() {
 
   return (
     <div className="container">
+      <TimezoneTile />
       <ApiResponseComponent data={apiResponseData} />
       <GoogleResponseComponent data={apiResponseData} />
       <PlannerbookForm onSubmit={handleFormSubmit} />

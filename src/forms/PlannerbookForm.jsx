@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import "../styles/PlannerbookForm.css";
 import Configuration from "../services/Configuration.jsx";
+import { DEFAULT_TIME_ZONE, parseDateTimeLocalInTimeZone } from "../utils/timezone";
 
 export function PlannerbookForm({ onSubmit }) {
   const [executionDateValid, setExecutionDateValid] = useState(true);
@@ -48,9 +49,11 @@ export function PlannerbookForm({ onSubmit }) {
 
     data.action = data.action === "Enable" ? 1 : 0;
 
-    const executionDate = new Date(data.executionDate);
-    const now = new Date();
-    if (executionDate < now) {
+    const executionDate = parseDateTimeLocalInTimeZone(
+      data.executionDate,
+      DEFAULT_TIME_ZONE
+    );
+    if (!executionDate || executionDate.getTime() < Date.now()) {
       setExecutionDateValid(false);
       return;
     } else {
@@ -129,8 +132,11 @@ export function PlannerbookForm({ onSubmit }) {
               required
               onChange={() => setExecutionDateValid(true)}
             />
+            <p className="form-hint">Input is interpreted as {DEFAULT_TIME_ZONE} time.</p>
             {!executionDateValid && (
-              <p className="form-error">Execution date cannot be in the past.</p>
+              <p className="form-error">
+                Execution date cannot be in the past ({DEFAULT_TIME_ZONE}).
+              </p>
             )}
             <div className="all-form-buttons">
               <button className="form-button" type="submit">

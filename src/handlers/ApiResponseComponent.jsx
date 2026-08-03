@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "../styles/ApiResponseComponent.css";
 import Configuration from "../services/Configuration.jsx";
+import { DEFAULT_TIME_ZONE, formatDateTimeInTimeZone } from "../utils/timezone";
 
 export function ApiResponseComponent() {
   const [data, setData] = useState([]);
@@ -60,19 +61,7 @@ export function ApiResponseComponent() {
     }
   };
 
-  // Helper function to format the execution date
-  const formatDate = (dateString) => {
-    const options = {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    };
-    return new Date(dateString).toLocaleDateString(undefined, options);
-  };
+  const formatDate = (dateString) => formatDateTimeInTimeZone(dateString, DEFAULT_TIME_ZONE);
 
   if (loading) {
     return <div>Loading planner books...</div>;
@@ -90,7 +79,7 @@ export function ApiResponseComponent() {
             <tr>
               <th>Campaign</th>
               <th>Action</th>
-              <th>Execution Time</th>
+              <th>Execution Time (Europe/Warsaw)</th>
             </tr>
           </thead>
           <tbody>
